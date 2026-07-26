@@ -30,6 +30,8 @@ set(SOURCES
 	src/Settings.cpp
 	src/SurvivalData.h
 	src/SurvivalData.cpp
+	src/Menus.h
+	src/Menus.cpp
 	src/Overlay.h
 	src/Overlay.cpp
 	src/Input.h

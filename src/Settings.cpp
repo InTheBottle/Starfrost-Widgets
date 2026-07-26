@@ -62,7 +62,8 @@ namespace StarfrostWidgets
 			widget.posY = kDefaultY[i];
 			widget.scale = 1.0f;
 			widget.style = WidgetStyle::kRing;
-			widget.hideWhenSatisfied = false;
+			widget.dynamic = false;
+			widget.showFromStage = 1;
 			for (std::size_t stage = 0; stage < kStageCount; ++stage) {
 				widget.stageColors[stage] = PackStageColor(kDefaultStageRamp[stage]);
 			}
@@ -113,7 +114,11 @@ namespace StarfrostWidgets
 			widget.scale = std::clamp(ReadFloat(ini, section, "fScale", widget.scale), 0.25f, 4.0f);
 			widget.style = static_cast<WidgetStyle>(std::clamp(
 				ini.GetLongValue(section, "iStyle", static_cast<long>(widget.style)), 0L, 2L));
-			widget.hideWhenSatisfied = ini.GetBoolValue(section, "bHideWhenSatisfied", widget.hideWhenSatisfied);
+			widget.dynamic = ini.GetBoolValue(section, "bDynamic",
+				ini.GetBoolValue(section, "bHideWhenSatisfied", widget.dynamic));
+			widget.showFromStage = static_cast<std::size_t>(std::clamp(
+				ini.GetLongValue(section, "iShowFromStage", static_cast<long>(widget.showFromStage)),
+				1L, static_cast<long>(kStageCount) - 1L));
 
 			for (std::size_t stage = 0; stage < kStageCount; ++stage) {
 				const auto key = std::format("sStage{}Color", stage);
@@ -177,7 +182,11 @@ namespace StarfrostWidgets
 			ini.SetDoubleValue(section, "fScale", widget.scale);
 			ini.SetLongValue(section, "iStyle", static_cast<long>(widget.style),
 				"; 0 = ring gauge, 1 = icon only, 2 = bar", false);
-			ini.SetBoolValue(section, "bHideWhenSatisfied", widget.hideWhenSatisfied);
+			ini.SetBoolValue(section, "bDynamic", widget.dynamic,
+				"; Only draw this widget once it has something to say. Needs and injuries\n"
+				"; appear as they get worse; buff timers appear as they run down.");
+			ini.SetLongValue(section, "iShowFromStage", static_cast<long>(widget.showFromStage),
+				"; The stage bDynamic starts drawing at, 1 - 5.", false);
 
 			for (std::size_t stage = 0; stage < kStageCount; ++stage) {
 				const auto key = std::format("sStage{}Color", stage);

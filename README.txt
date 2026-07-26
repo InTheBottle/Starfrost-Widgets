@@ -86,7 +86,10 @@ SETTINGS
                           210 = Insert. 88 = F12, 87 = F11, 68 = F10.
     fGlobalScale          Multiplies every widget's own scale. 0.25 - 4.0.
     fOpacity              0.05 - 1.0.
-    bHideInMenus          Hide while a menu or dialogue is open.
+    bHideInMenus          Hide while a menu is covering the screen. Catches the
+                          vanilla menus, dialogue, and custom menus other mods
+                          add - anything that pauses, goes modal, takes the
+                          cursor or takes the menu input context.
     bHideWhenHUDHidden    Follow the game's own HUD visibility, so screenshots
                           taken with the HUD off stay clean.
     bRequireSurvivalMode  Only show Hunger, Sleep and Cold while Survival Mode
@@ -109,9 +112,10 @@ SETTINGS
                           measured to the widget's top-left corner.
     fScale                0.25 - 4.0.
     iStyle                0 = ring gauge, 1 = icon only, 2 = bar.
-    bHideWhenSatisfied    Hide entirely while the widget is at stage 0. On a
-                          buff timer that means "stay hidden until it starts
-                          running low".
+    bDynamic              Only draw this widget once it has something to say,
+                          rather than sitting on the HUD all the time. See
+                          DYNAMIC WIDGETS below.
+    iShowFromStage        The stage bDynamic starts drawing at, 1 - 5.
     sStage0Color ...      Six RRGGBB colours, stage 0 (satisfied) through
     sStage5Color          stage 5 (critical). Injuries have four states, so
                           they use stages 0, 2, 4 and 5. The buff timers run
@@ -147,6 +151,33 @@ WHAT THE BUFF TIMERS WATCH
   Gourmet's duration perks are picked up for free. The Art of Cooking triples
   the food timer and Special Ingredients extends alcohol; the widget reads the
   effect's real duration, so a tripled buff simply shows a longer ring.
+
+DYNAMIC WIDGETS
+  A widget set to Dynamic stays off the HUD until it has something worth
+  saying, then appears and grades up as usual. Tick Dynamic in the edit panel,
+  or set bDynamic under that widget's section.
+
+  Show from stage picks how bad things have to get first, 1 through 5. The
+  colour swatches under the slider are that same 1 - 5 scale, so you can see
+  what the widget will look like when it does appear.
+
+    1  As soon as it is off full. Barely dynamic at all.
+    2  Once it is a real nudge rather than a rounding error.
+    3  Halfway. A sensible middle setting.
+    4  Getting serious.
+    5  Only at critical, right before it starts to hurt.
+
+  On the need widgets and injuries that means the widget appears as things get
+  worse. On the buff timers the ramp runs backwards, so it means the widget
+  appears as the buff runs down - a Blessing widget on stage 4 stays hidden for
+  most of its eight hours and turns up when it is nearly out.
+
+  Every widget still shows while edit mode is open, whatever this is set to, so
+  you can always position one you have hidden.
+
+  This replaces bHideWhenSatisfied, which was the same idea with the threshold
+  nailed to stage 1. An older ini that still has it is read as bDynamic, so
+  nothing needs changing by hand.
 
 WHICH HUNGER
   Starfrost has shipped two different hunger systems. This works with both, and
@@ -233,6 +264,10 @@ NOTES
     ENB's and ReShade's way.
 
 CHANGES IN 1.2.0
+  - Dynamic widgets. Any widget can be set to stay off the HUD until it has
+    something to say, with a per-widget threshold for how bad things have to
+    get first. Replaces bHideWhenSatisfied, which was the same idea fixed at
+    stage 1; old ini values are read across automatically.
   - Three new widgets, all buff timers rather than need gauges: Food and
     Alcohol from Gourmet, and Blessing from Pilgrim. They only draw while the
     buff is running, count down as it expires, and print the time left.
@@ -248,6 +283,17 @@ CHANGES IN 1.2.0
     shrine. It had been keyed on Pilgrim's XP marker effects, which are gated
     behind an anti-farming cooldown; it now matches the shrine-blessing keyword
     the boons themselves carry, which nothing gates.
+  - Fixed the overlay leaving its own render target bound after drawing, which
+    could send whatever the game drew next into the wrong surface. Other HUD
+    mods that draw through Scaleform were the visible casualty - TrueHUD's bars,
+    including the Blade & Blunt stagger bar, could misbehave. The game's render
+    target is now put back exactly as it was found.
+  - bHideInMenus now hides for custom menus other mods add, not just the vanilla
+    ones. It had tested only for a paused game and the dialogue menu, so a menu
+    like Character Menu SE - which takes the menu input context without pausing -
+    was drawn straight over. Menu state is now tracked from menu open and close
+    events on the main thread instead of being sampled from the render thread,
+    which also takes a latent data race out of the draw path.
   - Buff widgets badge what they fortify, so you can tell at a glance whether
     the twenty minutes left on your food is health, magicka, stamina or warmth.
   - bRequireSurvivalMode now only gates Hunger, Sleep and Cold. It had already

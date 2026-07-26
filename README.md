@@ -85,6 +85,24 @@ at each severity stage. Set all six to the same colour if you would rather a
 widget did not change colour at all; "Copy to all widgets" pushes one widget's
 ramp onto the rest.
 
+## Dynamic widgets
+
+Tick **Dynamic** on a widget and it stays off the HUD until it has something
+worth saying. **Show from stage** picks how bad things have to get first, 1
+through 5 — the same scale as the colour swatches sitting just below it, so you
+can see what it will look like when it does turn up.
+
+On the needs and injuries that means it appears as things get worse. On the buff
+timers the ramp runs backwards, so it means it appears as the buff runs down: a
+Blessing widget set to stage 4 stays hidden for most of its eight hours and shows
+up when it is nearly gone.
+
+Every widget still draws while edit mode is open regardless, so a hidden one can
+always be repositioned.
+
+This replaces `bHideWhenSatisfied`, which was the same idea with the threshold
+nailed to stage 1. An older ini that still has that key is read as `bDynamic`.
+
 Press **Insert** again or **Esc** to leave. Settings are written back to
 `Data/SKSE/Plugins/StarfrostWidgets.ini` on the way out, so hand-editing the ini
 and editing in game agree with each other.
@@ -128,6 +146,21 @@ out of ENB's and ReShade's way and works despite Skyrim clipping the cursor.
 Anything that touches game state — reading the player's spells, parking the
 control map, writing the ini — is bounced onto the main thread through SKSE's
 task queue.
+
+The render target the game had bound is saved and restored around the ImGui pass.
+ImGui's own state backup happens inside `RenderDrawData`, which is after the
+overlay has already rebound the output merger, so its restore would only put the
+overlay's target back rather than the game's. Skyrim's renderer caches what it
+believes is bound and skips redundant binds, so leaving the wrong target there
+sends whatever draws next into the wrong surface — which is how a HUD overlay
+ends up breaking an unrelated mod's Scaleform widgets.
+
+Menu visibility is tracked from `MenuOpenCloseEvent` on the main thread and
+published as an atomic, rather than sampling the menu stack from the render
+thread. A menu counts as covering the screen if it pauses, goes modal, takes the
+cursor or takes the menu input context, which catches custom menus from other
+mods as well as the vanilla ones. Always-open menus — the HUD, the cursor, the
+faders, other mods' widget layers — are ignored, or nothing would ever draw.
 
 ## Building
 

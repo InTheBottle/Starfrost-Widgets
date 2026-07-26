@@ -1,4 +1,5 @@
 #include "Input.h"
+#include "Menus.h"
 #include "Overlay.h"
 #include "Settings.h"
 #include "SurvivalData.h"
@@ -14,6 +15,7 @@ namespace
 			Settings::GetSingleton()->Load();
 			SurvivalData::GetSingleton()->ResolveForms();
 			Input::GetSingleton()->Install();
+			Menus::GetSingleton()->Install();
 			Overlay::Install();
 			break;
 

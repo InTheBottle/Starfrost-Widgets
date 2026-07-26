@@ -80,7 +80,8 @@ namespace StarfrostWidgets
 		float        posY{ 0.30f };
 		float        scale{ 1.0f };
 		WidgetStyle  style{ WidgetStyle::kRing };
-		bool         hideWhenSatisfied{ false };
+		bool         dynamic{ false };
+		std::size_t  showFromStage{ 1 };
 		ImU32        stageColors[kStageCount]{};
 	};
 

@@ -299,10 +299,23 @@ namespace StarfrostWidgets::Overlay
 			// Stops our hotkeys stealing Esc while a text box has the keyboard.
 			input->SetWantTextInput(io.WantTextInput);
 
+			ID3D11RenderTargetView* previousView{ nullptr };
+			ID3D11DepthStencilView* previousDepth{ nullptr };
+			gContext->OMGetRenderTargets(1, &previousView, &previousDepth);
+
 			// ImGui's backend sets and restores the viewport itself.
 			ID3D11RenderTargetView* view = target.view;
 			gContext->OMSetRenderTargets(1, &view, nullptr);
 			ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
+
+			gContext->OMSetRenderTargets(1, &previousView, previousDepth);
+
+			if (previousView) {
+				previousView->Release();
+			}
+			if (previousDepth) {
+				previousDepth->Release();
+			}
 		}
 
 		HRESULT WINAPI HookedPresent(IDXGISwapChain* a_swapChain, UINT a_syncInterval, UINT a_flags)

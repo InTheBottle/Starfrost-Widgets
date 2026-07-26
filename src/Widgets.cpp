@@ -1,6 +1,7 @@
 #include "Widgets.h"
 
 #include "Input.h"
+#include "Menus.h"
 #include "Settings.h"
 #include "SurvivalData.h"
 
@@ -434,7 +435,7 @@ namespace StarfrostWidgets::Widgets
 			if (a_settings.hideWhenHUDHidden && !ui->IsShowingMenus()) {
 				return true;
 			}
-			if (a_settings.hideInMenus && (ui->GameIsPaused() || ui->IsMenuOpen(RE::DialogueMenu::MENU_NAME))) {
+			if (a_settings.hideInMenus && Menus::GetSingleton()->CoveringMenuOpen()) {
 				return true;
 			}
 
@@ -605,7 +606,22 @@ namespace StarfrostWidgets::Widgets
 				if (ImGui::CollapsingHeader(kNames[i], i < 3 ? ImGuiTreeNodeFlags_DefaultOpen : 0)) {
 					ImGui::Checkbox("Enabled", &widget.enabled);
 					ImGui::SameLine();
-					ImGui::Checkbox(isTimer ? "Hide until it runs low" : "Hide when satisfied", &widget.hideWhenSatisfied);
+					ImGui::Checkbox("Dynamic", &widget.dynamic);
+					ImGui::SetItemTooltip(isTimer ?
+							"Stay hidden until the buff starts running down." :
+							"Stay hidden until there is something worth showing.");
+
+					ImGui::BeginDisabled(!widget.dynamic);
+					int showFrom = static_cast<int>(widget.showFromStage);
+					if (ImGui::SliderInt("Show from stage", &showFrom, 1, static_cast<int>(kStageCount) - 1)) {
+						widget.showFromStage = static_cast<std::size_t>(std::clamp(showFrom, 1, static_cast<int>(kStageCount) - 1));
+					}
+					ImGui::SetItemTooltip(isTimer ?
+							"1 appears as soon as the buff is past full, 5 only in the last moments.\n"
+							"The swatches below show which colour each stage draws in." :
+							"1 appears at the first sign, 5 only when critical.\n"
+							"The swatches below show which colour each stage draws in.");
+					ImGui::EndDisabled();
 
 					int style = static_cast<int>(widget.style);
 					if (ImGui::Combo("Style", &style, "Ring\0Icon\0Bar\0")) {
@@ -693,7 +709,7 @@ namespace StarfrostWidgets::Widgets
 				if (IsSurvivalNeed(gauge) && settings.requireSurvivalMode && !survivalOn) {
 					continue;
 				}
-				if (widget.hideWhenSatisfied && state.stage == 0) {
+				if (widget.dynamic && state.stage < widget.showFromStage) {
 					continue;
 				}
 			}
