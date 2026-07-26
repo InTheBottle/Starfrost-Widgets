@@ -1,9 +1,18 @@
-Starfrost Widgets 1.1.0
+Starfrost Widgets 1.2.0
 by bottle
 
-Live HUD widgets for Starfrost's survival needs and Blade & Blunt's injuries.
-Three gauges - Hunger, Sleep and Injury - sit on the HUD and colour-grade from
-green to red as things get worse. A fourth, Cold, is included but switched off.
+Live HUD widgets for Starfrost's survival needs, Blade & Blunt's injuries, and
+the timed buffs from Gourmet and Pilgrim.
+
+Three need gauges - Hunger, Sleep and Injury - sit on the HUD and colour-grade
+from green to red as things get worse. A fourth, Cold, is included but switched
+off.
+
+Three buff timers - Food, Alcohol and Blessing - run the same ramp backwards:
+the ring starts full and green when the buff lands and empties towards red as it
+runs out, with the time left printed underneath. The food and alcohol widgets
+also badge what is currently fortified.
+
 Everything can be dragged into place in game.
 
 REQUIREMENTS
@@ -13,6 +22,8 @@ REQUIREMENTS
   - Creation Club Survival Mode
   - Survival Mode Improved
   - Blade & Blunt, with bEnableInjuries = true (only for the Injury widget)
+  - Gourmet - A Cooking Overhaul (only for the Food and Alcohol widgets)
+  - Pilgrim - A Religion Overhaul (only for the Blessing widget)
 
   Skyrim VR is not supported.
 
@@ -67,28 +78,62 @@ SETTINGS
     bHideInMenus          Hide while a menu or dialogue is open.
     bHideWhenHUDHidden    Follow the game's own HUD visibility, so screenshots
                           taken with the HUD off stay clean.
-    bRequireSurvivalMode  Only show the need widgets while Survival Mode is on.
-                          Injuries ignore this - they are Blade & Blunt's, not
-                          Survival Mode's.
-    bShowValues           Print the raw need value under each widget.
-    bPulseAtCritical      Pulse a widget at its highest severity stage.
+    bRequireSurvivalMode  Only show Hunger, Sleep and Cold while Survival Mode
+                          is on. Injuries and the buff timers ignore this - they
+                          belong to other mods, not to Survival Mode.
+    bShowValues           Print the raw need value under each need widget.
+    bShowTimers           Print the time left under each buff widget.
+    bShowAttributes       Badge the buff widgets with what they fortify. Red
+                          circle = health, blue diamond = magicka, green
+                          triangle = stamina, orange square = warmth.
+    bPulseAtCritical      Pulse a widget at its highest severity stage. On a
+                          buff timer that is the warning it is about to drop.
     fPollInterval         Seconds between reads of the game's need values.
     iRenderTarget         Where the overlay draws. See FRAME GENERATION below.
                           0 = auto, 1 = swap chain, 2 = game framebuffer.
 
-  [Hunger] [Sleep] [Injury] [Cold]
+  [Hunger] [Sleep] [Injury] [Cold] [FoodBuff] [Alcohol] [Blessing]
     bEnabled              Show this widget.
     fPosX, fPosY          Position as a fraction of screen size, 0.0 - 1.0,
                           measured to the widget's top-left corner.
     fScale                0.25 - 4.0.
     iStyle                0 = ring gauge, 1 = icon only, 2 = bar.
-    bHideWhenSatisfied    Hide entirely while the need is at stage 0.
+    bHideWhenSatisfied    Hide entirely while the widget is at stage 0. On a
+                          buff timer that means "stay hidden until it starts
+                          running low".
     sStage0Color ...      Six RRGGBB colours, stage 0 (satisfied) through
     sStage5Color          stage 5 (critical). Injuries have four states, so
-                          they use stages 0, 2, 4 and 5.
+                          they use stages 0, 2, 4 and 5. The buff timers run
+                          the ramp backwards - a fresh buff is stage 0 and one
+                          about to expire is stage 5.
 
   Cold is off by default because Starfrost already gives it a vanilla HUD
   meter. Set bEnabled = true under [Cold] if you would rather use this one.
+
+  The three buff widgets only draw while their buff is actually running, so
+  they cost you nothing on screen the rest of the time.
+
+WHAT THE BUFF TIMERS WATCH
+  Food      Gourmet's food regeneration effects - health, magicka and stamina,
+            including the Homecooked Meal versions that grant all three - plus
+            Survival Mode's warmth effect, which Gourmet's survival stews use
+            and a few of them grant on its own.
+
+  Alcohol   Gourmet's drink effects: Clarity trades stamina for magicka,
+            Courage trades magicka for stamina. The badge shows what you
+            gained.
+
+  Blessing  Every one of Pilgrim's 45 shrine blessings, Aedric and Daedric
+            alike. They all carry one of two marker effects and nothing else in
+            the mod uses them, so there is no per-deity list that can fall out
+            of date. The edit panel names the blessing that is running.
+
+  Where more than one effect is running on a widget, the timer follows the one
+  with the longest left, so it reads as "this buff is gone in X".
+
+  Gourmet's duration perks are picked up for free. The Art of Cooking triples
+  the food timer and Special Ingredients extends alcohol; the widget reads the
+  effect's real duration, so a tripled buff simply shows a longer ring.
 
 FRAME GENERATION
   Frame generation - Community Shaders' Upscaling feature, or any of the FSR3 /
@@ -125,15 +170,17 @@ VERIFYING IT LOADED
   A working load looks like:
     info: StarfrostWidgets loaded
     info: Loaded settings from Data/SKSE/Plugins/StarfrostWidgets.ini
-    info: Form resolution: hunger=true sleep=true cold=true injuries=true
+    info: Form resolution: hunger=true sleep=true cold=true injuries=true food=7 alcohol=4 blessing=2
     info: Input poll hook installed
     info: Present hook installed
     info: ImGui initialised
     info: Drawing into the game framebuffer (2560x1440)
 
   A false in that form resolution line means the matching mod is not installed
-  or is not where the plugin expected it, and that widget will stay hidden.
-  Warnings just above it name the exact records that could not be found.
+  or is not where the plugin expected it, and that widget will stay hidden. The
+  food, alcohol and blessing entries are counts of effects found rather than
+  true/false; a zero there means that widget has nothing to watch. Warnings just
+  above it name the exact records that could not be found.
 
   If the log does not exist, SKSE is not loading the plugin - confirm you
   launched through skse64_loader.exe and that the DLL is in Data\SKSE\Plugins.
@@ -144,9 +191,23 @@ NOTES
     the game with no script latency.
   - Records are found by editor ID first, so Starfrost's overrides of the
     vanilla thresholds are picked up automatically.
+  - Buff timers walk the player's active effect list and take the time left
+    straight off the matching effect, so they show the same number the vanilla
+    Active Effects menu does.
   - Drawing is done on the swap chain's Present call, and input comes from
     SKSE's own input events rather than a window hook. That keeps this out of
     ENB's and ReShade's way.
+
+CHANGES IN 1.2.0
+  - Three new widgets, all buff timers rather than need gauges: Food and
+    Alcohol from Gourmet, and Blessing from Pilgrim. They only draw while the
+    buff is running, count down as it expires, and print the time left.
+  - Buff widgets badge what they fortify, so you can tell at a glance whether
+    the twenty minutes left on your food is health, magicka, stamina or warmth.
+  - bRequireSurvivalMode now only gates Hunger, Sleep and Cold. It had already
+    been ignoring injuries; that exception is now the general rule for anything
+    that does not come from Survival Mode.
+  - Added bShowTimers and bShowAttributes.
 
 CHANGES IN 1.1.0
   - Sliders now take typed input. Ctrl+click one and enter the number you

@@ -8,7 +8,17 @@ namespace StarfrostWidgets::Widgets
 {
 	namespace
 	{
-		constexpr const char* kNames[kGaugeCount] = { "Hunger", "Sleep", "Injury", "Cold" };
+		constexpr const char* kNames[kGaugeCount] = {
+			"Hunger", "Sleep", "Injury", "Cold", "Food", "Alcohol", "Blessing"
+		};
+
+		// Health, magicka, stamina - the Skyrim bar colours, near enough - then warmth.
+		constexpr ImU32 kAttributeColors[kBuffAttributeCount] = {
+			IM_COL32(214, 74, 66, 255),
+			IM_COL32(78, 138, 222, 255),
+			IM_COL32(94, 186, 96, 255),
+			IM_COL32(232, 146, 62, 255)
+		};
 
 		// Footprints at scale 1.0, sized against a 1080p HUD.
 		constexpr float kRingBox = 76.0f;
@@ -45,6 +55,24 @@ namespace StarfrostWidgets::Widgets
 			return (a_color & ~IM_COL32_A_MASK) | (alpha << IM_COL32_A_SHIFT);
 		}
 
+		[[nodiscard]] float AlphaOf(ImU32 a_color)
+		{
+			return static_cast<float>((a_color >> IM_COL32_A_SHIFT) & 0xFF) / 255.0f;
+		}
+
+		// Buff timers count down, so "8h 02m" beats a bare number of seconds.
+		[[nodiscard]] std::string FormatDuration(float a_seconds)
+		{
+			const auto total = static_cast<int>(std::max(a_seconds, 0.0f) + 0.5f);
+			if (total >= 3600) {
+				return std::format("{}h {:02}m", total / 3600, (total % 3600) / 60);
+			}
+			if (total >= 60) {
+				return std::format("{}:{:02}", total / 60, total % 60);
+			}
+			return std::format("{}s", total);
+		}
+
 		[[nodiscard]] ImVec2 BoxSize(const WidgetSettings& a_widget, float a_scale)
 		{
 			switch (a_widget.style) {
@@ -65,7 +93,7 @@ namespace StarfrostWidgets::Widgets
 			const ImVec2 pos{ a_center.x - extent.x * 0.5f, a_center.y - extent.y * 0.5f };
 
 			// Outline, so the text reads over snow and sky alike.
-			a_list->AddText(font, a_size, pos + ImVec2{ 1.0f, 1.0f }, WithAlpha(kShadowColor, (a_color >> IM_COL32_A_SHIFT & 0xFF) / 255.0f), a_text);
+			a_list->AddText(font, a_size, pos + ImVec2{ 1.0f, 1.0f }, WithAlpha(kShadowColor, AlphaOf(a_color)), a_text);
 			a_list->AddText(font, a_size, pos, a_color, a_text);
 		}
 
@@ -154,6 +182,164 @@ namespace StarfrostWidgets::Widgets
 			}
 		}
 
+		void DrawFoodBuffIcon(ImDrawList* a_list, ImVec2 a_center, float a_radius, ImU32 a_color)
+		{
+			// A bowl of soup: a half disc under an overhanging rim, steam rising off it.
+			const float rimY = a_center.y + a_radius * 0.18f;
+			const float bowl = a_radius * 0.72f;
+
+			a_list->PathArcTo({ a_center.x, rimY }, bowl, 0.0f, kPi, 24);
+			a_list->PathFillConvex(a_color);
+			a_list->AddLine({ a_center.x - bowl * 1.18f, rimY }, { a_center.x + bowl * 1.18f, rimY },
+				a_color, a_radius * 0.17f);
+
+			// Three ribbons with the same lean, so they read as rising rather than as bars.
+			for (int ribbon = 0; ribbon < 3; ++ribbon) {
+				const float baseY = rimY - a_radius * 0.24f;
+				const float originX = a_center.x + (static_cast<float>(ribbon) - 1.0f) * a_radius * 0.38f;
+				const float height = a_radius * (ribbon == 1 ? 0.90f : 0.68f);
+
+				constexpr int kSteps = 5;
+				ImVec2       points[kSteps];
+				for (int step = 0; step < kSteps; ++step) {
+					const float t = static_cast<float>(step) / static_cast<float>(kSteps - 1);
+					points[step] = { originX + std::sin(t * kPi * 1.6f) * a_radius * 0.14f, baseY - height * t };
+				}
+				a_list->AddPolyline(points, kSteps, a_color, ImDrawFlags_None, a_radius * 0.11f);
+			}
+		}
+
+		void DrawAlcoholIcon(ImDrawList* a_list, ImVec2 a_center, float a_radius, ImU32 a_color)
+		{
+			// A mead bottle: square-shouldered body, tapered neck, corked.
+			const float bodyHalf = a_radius * 0.42f;
+			const float neckHalf = a_radius * 0.135f;
+			const float bodyTop = a_center.y - a_radius * 0.10f;
+			const float bodyBottom = a_center.y + a_radius * 0.92f;
+			const float neckBottom = a_center.y - a_radius * 0.34f;
+			const float neckTop = a_center.y - a_radius * 0.70f;
+			const ImU32 seam = WithAlpha(IM_COL32(16, 13, 11, 255), AlphaOf(a_color) * 0.9f);
+
+			// Only the base rounds, so the shoulder meets a flat edge instead of a notch.
+			a_list->AddRectFilled({ a_center.x - bodyHalf, bodyTop }, { a_center.x + bodyHalf, bodyBottom },
+				a_color, a_radius * 0.16f, ImDrawFlags_RoundCornersBottom);
+
+			const ImVec2 shoulder[4] = {
+				{ a_center.x - bodyHalf, bodyTop },
+				{ a_center.x - neckHalf, neckBottom },
+				{ a_center.x + neckHalf, neckBottom },
+				{ a_center.x + bodyHalf, bodyTop }
+			};
+			a_list->AddConvexPolyFilled(shoulder, 4, a_color);
+			a_list->AddRectFilled({ a_center.x - neckHalf, neckTop }, { a_center.x + neckHalf, neckBottom }, a_color);
+
+			// Cork, held off the neck by a dark seam so the two do not merge.
+			a_list->AddRectFilled({ a_center.x - a_radius * 0.22f, a_center.y - a_radius * 0.96f },
+				{ a_center.x + a_radius * 0.22f, a_center.y - a_radius * 0.66f }, a_color, a_radius * 0.05f);
+			a_list->AddLine({ a_center.x - a_radius * 0.22f, a_center.y - a_radius * 0.665f },
+				{ a_center.x + a_radius * 0.22f, a_center.y - a_radius * 0.665f }, seam, a_radius * 0.07f);
+
+			// A label knocked out of the body, so the bottle is not one flat blob.
+			a_list->AddRectFilled({ a_center.x - bodyHalf, a_center.y + a_radius * 0.24f },
+				{ a_center.x + bodyHalf, a_center.y + a_radius * 0.54f }, seam);
+		}
+
+		void DrawBlessingIcon(ImDrawList* a_list, ImVec2 a_center, float a_radius, ImU32 a_color)
+		{
+			// Mara's shrine medallion: two concentric bands, four knotwork petals
+			// crossing the inner one on the cardinals, and a plain boss at the middle.
+			a_list->AddCircle(a_center, a_radius * 0.95f, a_color, 32, a_radius * 0.14f);
+			a_list->AddCircle(a_center, a_radius * 0.55f, a_color, 28, a_radius * 0.085f);
+
+			constexpr int kSteps = 11;
+			for (int petal = 0; petal < 4; ++petal) {
+				const float  angle = kPi * 0.5f * static_cast<float>(petal);
+				const ImVec2 axis{ std::cos(angle), std::sin(angle) };
+				const ImVec2 normal{ -axis.y, axis.x };
+
+				// A lens that tapers to a point at the boss and again at the outer band.
+				ImVec2 points[kSteps * 2];
+				for (int step = 0; step < kSteps; ++step) {
+					const float t = static_cast<float>(step) / static_cast<float>(kSteps - 1);
+					const float along = a_radius * (0.18f + 0.72f * t);
+					const float across = a_radius * 0.20f * std::sin(t * kPi);
+
+					points[step] = { a_center.x + axis.x * along + normal.x * across,
+						a_center.y + axis.y * along + normal.y * across };
+					points[kSteps * 2 - 1 - step] = { a_center.x + axis.x * along - normal.x * across,
+						a_center.y + axis.y * along - normal.y * across };
+				}
+				a_list->AddPolyline(points, kSteps * 2, a_color, ImDrawFlags_Closed, a_radius * 0.075f);
+			}
+
+			a_list->AddCircleFilled(a_center, a_radius * 0.19f, a_color, 20);
+		}
+
+		// Circle, diamond, triangle and square, so the four stay apart by shape as well
+		// as by colour - at badge size the shape is what actually carries.
+		void DrawAttributeBadge(ImDrawList* a_list, std::uint32_t a_index, ImVec2 a_center, float a_radius, float a_alpha)
+		{
+			const ImU32 fill = WithAlpha(kAttributeColors[a_index], a_alpha);
+
+			a_list->AddCircleFilled(a_center, a_radius * 1.42f, WithAlpha(IM_COL32(10, 9, 8, 255), a_alpha), 12);
+
+			switch (a_index) {
+			case 0:
+				a_list->AddCircleFilled(a_center, a_radius, fill, 12);
+				break;
+			case 1: {
+				const ImVec2 diamond[4] = {
+					{ a_center.x, a_center.y - a_radius * 1.18f },
+					{ a_center.x + a_radius * 1.18f, a_center.y },
+					{ a_center.x, a_center.y + a_radius * 1.18f },
+					{ a_center.x - a_radius * 1.18f, a_center.y }
+				};
+				a_list->AddConvexPolyFilled(diamond, 4, fill);
+				break;
+			}
+			case 2:
+				a_list->AddTriangleFilled(
+					{ a_center.x, a_center.y - a_radius * 1.18f },
+					{ a_center.x + a_radius * 1.06f, a_center.y + a_radius * 0.80f },
+					{ a_center.x - a_radius * 1.06f, a_center.y + a_radius * 0.80f },
+					fill);
+				break;
+			default:
+				a_list->AddRectFilled(
+					{ a_center.x - a_radius * 0.90f, a_center.y - a_radius * 0.90f },
+					{ a_center.x + a_radius * 0.90f, a_center.y + a_radius * 0.90f },
+					fill, a_radius * 0.22f);
+				break;
+			}
+		}
+
+		// A centred row across the bottom of the widget box.
+		void DrawAttributeBadges(ImDrawList* a_list, ImVec2 a_origin, ImVec2 a_size,
+			const GaugeState& a_state, float a_scale, float a_alpha)
+		{
+			std::uint32_t present[kBuffAttributeCount]{};
+			std::uint32_t count = 0;
+			for (std::uint32_t i = 0; i < kBuffAttributeCount; ++i) {
+				if (a_state.attributes & (1u << i)) {
+					present[count++] = i;
+				}
+			}
+
+			if (count == 0) {
+				return;
+			}
+
+			const float radius = 4.4f * a_scale;
+			const float step = radius * 3.2f;
+			const float y = a_origin.y + a_size.y - radius * 1.5f;
+			float       x = a_origin.x + a_size.x * 0.5f - step * (static_cast<float>(count) - 1.0f) * 0.5f;
+
+			for (std::uint32_t i = 0; i < count; ++i) {
+				DrawAttributeBadge(a_list, present[i], { x, y }, radius, a_alpha);
+				x += step;
+			}
+		}
+
 		void DrawIcon(ImDrawList* a_list, Gauge a_gauge, ImVec2 a_center, float a_radius, ImU32 a_color, std::size_t a_tier)
 		{
 			switch (a_gauge) {
@@ -165,6 +351,15 @@ namespace StarfrostWidgets::Widgets
 				break;
 			case Gauge::kInjury:
 				DrawInjuryIcon(a_list, a_center, a_radius, a_color, a_tier);
+				break;
+			case Gauge::kFoodBuff:
+				DrawFoodBuffIcon(a_list, a_center, a_radius, a_color);
+				break;
+			case Gauge::kAlcohol:
+				DrawAlcoholIcon(a_list, a_center, a_radius, a_color);
+				break;
+			case Gauge::kBlessing:
+				DrawBlessingIcon(a_list, a_center, a_radius, a_color);
 				break;
 			case Gauge::kCold:
 			default:
@@ -271,15 +466,27 @@ namespace StarfrostWidgets::Widgets
 				break;
 			}
 
-			if (a_settings.showValues) {
-				const auto text = a_gauge == Gauge::kInjury ?
-				                      std::format("{}/3", static_cast<int>(a_state.value)) :
-				                      std::format("{}", static_cast<int>(a_state.value));
+			const auto caption = [&](const std::string& a_text, float a_drop) {
 				AddCenteredText(a_list,
-					{ a_origin.x + a_size.x * 0.5f, a_origin.y + a_size.y + 8.0f * a_scale },
+					{ a_origin.x + a_size.x * 0.5f, a_origin.y + a_size.y + a_drop * a_scale },
 					ImGui::GetFontSize() * a_scale,
 					WithAlpha(IM_COL32(235, 232, 226, 255), alpha),
-					text.c_str());
+					a_text.c_str());
+			};
+
+			if (a_state.timer) {
+				if (a_settings.showAttributes) {
+					DrawAttributeBadges(a_list, a_origin, a_size, a_state, a_scale, alpha);
+				}
+				if (a_settings.showTimers) {
+					// Clear of the badge row, which sits inside the bottom of the box.
+					caption(FormatDuration(a_state.value), 11.0f);
+				}
+			} else if (a_settings.showValues) {
+				caption(a_gauge == Gauge::kInjury ?
+						std::format("{}/3", static_cast<int>(a_state.value)) :
+						std::format("{}", static_cast<int>(a_state.value)),
+					8.0f);
 			}
 		}
 
@@ -305,9 +512,16 @@ namespace StarfrostWidgets::Widgets
 			ImGui::SameLine();
 			ImGui::Checkbox("Follow HUD", &a_settings.hideWhenHUDHidden);
 			ImGui::Checkbox("Only in Survival Mode", &a_settings.requireSurvivalMode);
+			ImGui::SetItemTooltip("Applies to hunger, sleep and cold. Injuries and buff timers always show.");
 			ImGui::SameLine();
 			ImGui::Checkbox("Show values", &a_settings.showValues);
 			ImGui::Checkbox("Pulse at critical", &a_settings.pulseAtCritical);
+			ImGui::Checkbox("Show time left", &a_settings.showTimers);
+			ImGui::SameLine();
+			ImGui::Checkbox("Show buff badges", &a_settings.showAttributes);
+			ImGui::SetItemTooltip(
+				"Red circle = health, blue diamond = magicka,\n"
+				"green triangle = stamina, orange square = warmth.");
 
 			int target = static_cast<int>(a_settings.renderTarget);
 			if (ImGui::Combo("Draw into", &target, "Auto\0Swap chain\0Game framebuffer\0")) {
@@ -327,11 +541,13 @@ namespace StarfrostWidgets::Widgets
 				auto&      widget = a_settings.Widget(gauge);
 				const auto& state = data->Get(gauge);
 
+				const bool isTimer = IsTimerGauge(gauge);
+
 				ImGui::PushID(static_cast<int>(i));
 				if (ImGui::CollapsingHeader(kNames[i], i < 3 ? ImGuiTreeNodeFlags_DefaultOpen : 0)) {
 					ImGui::Checkbox("Enabled", &widget.enabled);
 					ImGui::SameLine();
-					ImGui::Checkbox("Hide when satisfied", &widget.hideWhenSatisfied);
+					ImGui::Checkbox(isTimer ? "Hide until it runs low" : "Hide when satisfied", &widget.hideWhenSatisfied);
 
 					int style = static_cast<int>(widget.style);
 					if (ImGui::Combo("Style", &style, "Ring\0Icon\0Bar\0")) {
@@ -342,11 +558,17 @@ namespace StarfrostWidgets::Widgets
 					sPositionsDirty |= ImGui::SliderFloat("X", &widget.posX, 0.0f, 1.0f, "%.4f");
 					sPositionsDirty |= ImGui::SliderFloat("Y", &widget.posY, 0.0f, 1.0f, "%.4f");
 
-					if (state.available) {
+					if (!state.available) {
+						ImGui::TextDisabled(isTimer ? "not running - no buff active or forms missing" :
+													  "no data - system off or forms missing");
+					} else if (state.timer) {
+						ImGui::TextDisabled("%s   %s left of %s",
+							state.label[0] ? state.label : "active",
+							FormatDuration(state.value).c_str(),
+							FormatDuration(state.maxValue).c_str());
+					} else {
 						ImGui::TextDisabled("stage %d   value %.0f / %.0f",
 							static_cast<int>(state.stage), state.value, state.maxValue);
-					} else {
-						ImGui::TextDisabled("no data - system off or forms missing");
 					}
 				}
 				ImGui::PopID();
@@ -402,8 +624,8 @@ namespace StarfrostWidgets::Widgets
 				if (!state.available) {
 					continue;
 				}
-				// Injuries are Blade & Blunt's, so they ignore Survival Mode.
-				if (gauge != Gauge::kInjury && settings.requireSurvivalMode && !survivalOn) {
+				// Injuries and the buff timers come from other mods, so they ignore Survival Mode.
+				if (IsSurvivalNeed(gauge) && settings.requireSurvivalMode && !survivalOn) {
 					continue;
 				}
 				if (widget.hideWhenSatisfied && state.stage == 0) {

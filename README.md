@@ -1,9 +1,13 @@
 # Starfrost Widgets
 
-An SKSE plugin that puts three live HUD widgets on screen for
+An SKSE plugin that puts live HUD widgets on screen for
 [Starfrost](https://www.nexusmods.com/skyrimspecialedition/mods/93732)'s survival
-needs and [Blade & Blunt](https://www.nexusmods.com/skyrimspecialedition/mods/49015)'s
-injuries:
+needs, [Blade & Blunt](https://www.nexusmods.com/skyrimspecialedition/mods/49015)'s
+injuries, and the timed buffs from
+[Gourmet](https://www.nexusmods.com/skyrimspecialedition/mods/60063) and
+[Pilgrim](https://www.nexusmods.com/skyrimspecialedition/mods/45557).
+
+### Needs
 
 | Widget | Icon | Source |
 | --- | --- | --- |
@@ -12,8 +16,36 @@ injuries:
 | Injury | cracked heart | `MAG_InjurySpell01/02/03` on the player |
 | Cold *(optional, off by default)* | snowflake | `Survival_ColdNeedValue` + `Survival_ColdStage1..5Value` |
 
-Each widget grades from green through red across six severity stages, and can be
-drawn as a ring gauge, a bare icon, or a bar. Everything is moveable in game.
+These grade from green through red across six severity stages as the need climbs.
+
+### Buff timers
+
+| Widget | Icon | Source |
+| --- | --- | --- |
+| Food | steaming bowl of soup | Gourmet's `MAG_FoodFortify{Health,Magicka,Stamina}Regen{Basic,Marriage}`, plus `Survival_FoodFortifyWarmth` |
+| Alcohol | mead bottle | Gourmet's `MAG_AlcoholFortify{Magicka,Stamina}` and their paired drains |
+| Blessing | Shrine of Mara medallion | Pilgrim's `MAG_PilgrimXPEffect` / `MAG_CultistXPEffect` |
+
+These read the same ramp backwards: the ring starts full and green when the buff
+lands and empties towards red as it runs out, so the pulse at the last stage is a
+warning that it is about to drop. The remaining time is printed underneath.
+
+Because a single food effect does not tell you the whole story, the food and
+alcohol widgets carry a badge row for what is currently fortified — a red circle
+for health, a blue diamond for magicka, a green triangle for stamina, an orange
+square for warmth. Eat a Homecooked Meal and the first three all light up.
+
+Warmth is in there because Gourmet's survival stews grant Survival Mode's own
+`Survival_FoodFortifyWarmth` on the same twenty-minute timer, and a few of them
+grant nothing else — without it those bowls would show no food timer at all.
+
+The blessing widget covers all 45 of Pilgrim's blessings, Aedric and Daedric
+alike: every one of them carries one of those two marker effects and nothing else
+in the mod uses them, so there is no per-deity list to keep in sync. Which
+blessing is running is named in the edit panel.
+
+Every widget can be drawn as a ring gauge, a bare icon, or a bar, and everything
+is moveable in game.
 
 ## Moving things around
 
@@ -36,6 +68,8 @@ change.
 - Survival Mode Improved (for the exhaustion and cold stage thresholds, and the
   per-need enable switches)
 - Blade & Blunt with `bEnableInjuries = true` — only needed for the injury widget
+- Gourmet — A Cooking Overhaul — only needed for the food and alcohol widgets
+- Pilgrim — A Religion Overhaul — only needed for the blessing widget
 
 Missing any of these is not fatal: a widget whose forms cannot be resolved simply
 does not draw, and the plugin logs which lookups failed to
@@ -50,6 +84,12 @@ variables rather than through Papyrus, so the widgets track the game with no
 script latency. Forms are resolved by editor ID first, which means Starfrost's
 overrides of the vanilla values are picked up automatically; the plugin + form ID
 pair is only a fallback.
+
+The buff timers walk the player's active effect list and match each entry's base
+effect against the handful of forms above, taking `duration - elapsedSeconds` from
+the longest runner. That is the same number the vanilla Active Effects menu shows,
+and it picks up Gourmet's duration perks for free — The Art of Cooking triples the
+food timer and the widget just sees a longer duration.
 
 Drawing is Dear ImGui on a `IDXGISwapChain::Present` vtable hook. Input comes
 from SKSE's own input events rather than a `WndProc` hook, which keeps the plugin

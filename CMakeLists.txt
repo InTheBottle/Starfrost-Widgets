@@ -3,8 +3,8 @@ cmake_minimum_required(VERSION 3.21)
 project(
 	StarfrostWidgets
 	LANGUAGES CXX
-	VERSION 1.1.0
-	DESCRIPTION "Real-time HUD widgets for Starfrost survival needs and Blade & Blunt injuries"
+	VERSION 1.2.0
+	DESCRIPTION "Real-time HUD widgets for Starfrost survival needs, Blade & Blunt injuries, and Gourmet/Pilgrim buff timers"
 )
 
 set(CMAKE_CXX_STANDARD 23)

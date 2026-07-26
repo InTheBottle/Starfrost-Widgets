@@ -6,7 +6,9 @@ namespace StarfrostWidgets
 {
 	namespace
 	{
-		constexpr const char* kSections[kGaugeCount] = { "Hunger", "Sleep", "Injury", "Cold" };
+		constexpr const char* kSections[kGaugeCount] = {
+			"Hunger", "Sleep", "Injury", "Cold", "FoodBuff", "Alcohol", "Blessing"
+		};
 
 		// Green through deep red.
 		constexpr std::uint32_t kDefaultRamp[kStageCount] = {
@@ -59,7 +61,9 @@ namespace StarfrostWidgets
 	Settings::Settings()
 	{
 		// Stacked down the left edge, clear of the compass and the vanilla meters.
-		constexpr float kDefaultY[kGaugeCount] = { 0.300f, 0.375f, 0.450f, 0.525f };
+		constexpr float kDefaultY[kGaugeCount] = {
+			0.300f, 0.375f, 0.450f, 0.525f, 0.600f, 0.675f, 0.750f
+		};
 
 		for (std::size_t i = 0; i < kGaugeCount; ++i) {
 			auto& widget = widgets[i];
@@ -102,6 +106,8 @@ namespace StarfrostWidgets
 		hideWhenHUDHidden = ini.GetBoolValue("General", "bHideWhenHUDHidden", hideWhenHUDHidden);
 		requireSurvivalMode = ini.GetBoolValue("General", "bRequireSurvivalMode", requireSurvivalMode);
 		showValues = ini.GetBoolValue("General", "bShowValues", showValues);
+		showTimers = ini.GetBoolValue("General", "bShowTimers", showTimers);
+		showAttributes = ini.GetBoolValue("General", "bShowAttributes", showAttributes);
 		pulseAtCritical = ini.GetBoolValue("General", "bPulseAtCritical", pulseAtCritical);
 		pollInterval = std::clamp(ReadFloat(ini, "General", "fPollInterval", pollInterval), 0.05f, 5.0f);
 		renderTarget = static_cast<RenderTarget>(std::clamp(
@@ -154,6 +160,12 @@ namespace StarfrostWidgets
 			"; Only show the need widgets while Survival Mode is switched on.");
 		ini.SetBoolValue("General", "bShowValues", showValues,
 			"; Print the raw need value under each widget.");
+		ini.SetBoolValue("General", "bShowTimers", showTimers,
+			"; Print the time left under the buff widgets (food, alcohol, blessing).");
+		ini.SetBoolValue("General", "bShowAttributes", showAttributes,
+			"; Badge the buff widgets with what they fortify: a red circle for health,\n"
+			"; a blue diamond for magicka, a green triangle for stamina, an orange\n"
+			"; square for warmth.");
 		ini.SetBoolValue("General", "bPulseAtCritical", pulseAtCritical,
 			"; Pulse the widget at the highest severity stage.");
 		ini.SetDoubleValue("General", "fPollInterval", pollInterval,

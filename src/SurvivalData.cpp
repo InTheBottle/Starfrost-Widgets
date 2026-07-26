@@ -7,6 +7,8 @@ namespace StarfrostWidgets
 		constexpr const char* kSurvivalPlugin = "ccQDRSSE001-SurvivalMode.esl";
 		constexpr const char* kSMIPlugin = "SurvivalModeImproved.esp";
 		constexpr const char* kInjuryPlugin = "BladeAndBlunt.esp";
+		constexpr const char* kGourmetPlugin = "Gourmet.esp";
+		constexpr const char* kPilgrimPlugin = "Pilgrim.esp";
 
 		// Editor IDs survive Starfrost's overrides; plugin + form id is the fallback.
 		template <class T>
@@ -50,6 +52,49 @@ namespace StarfrostWidgets
 			}
 			return stage;
 		}
+
+		// The need ramp inverted: a fresh buff sits at 0, one about to drop off at 5.
+		[[nodiscard]] std::size_t StageFromRemaining(float a_fraction)
+		{
+			constexpr float kThresholds[5] = { 0.75f, 0.50f, 0.30f, 0.15f, 0.05f };
+
+			std::size_t stage = 0;
+			for (std::size_t i = 0; i < 5; ++i) {
+				if (a_fraction < kThresholds[i]) {
+					stage = i + 1;
+				} else {
+					break;
+				}
+			}
+			return stage;
+		}
+
+		void CopyLabel(char (&a_dest)[64], const char* a_source)
+		{
+			std::size_t i = 0;
+			if (a_source) {
+				for (; i + 1 < sizeof(a_dest) && a_source[i] != '\0'; ++i) {
+					a_dest[i] = a_source[i];
+				}
+			}
+			a_dest[i] = '\0';
+		}
+
+		// What a single gauge picked up from one pass over the active effect list.
+		struct BuffAccumulator
+		{
+			float         remaining{ -1.0f };
+			float         duration{ 0.0f };
+			std::uint32_t attributes{ 0 };
+			const char*   label{ nullptr };
+		};
+	}
+
+	void SurvivalData::BuffForms::Add(RE::EffectSetting* a_form, BuffAttribute a_attribute)
+	{
+		if (a_form && count < kMaxTrackedEffects) {
+			effects[count++] = { a_form, static_cast<std::uint32_t>(a_attribute) };
+		}
 	}
 
 	void SurvivalData::ResolveForms()
@@ -91,13 +136,47 @@ namespace StarfrostWidgets
 		injurySpells[1] = Lookup<RE::SpellItem>("MAG_InjurySpell02", 0x00084B, kInjuryPlugin);
 		injurySpells[2] = Lookup<RE::SpellItem>("MAG_InjurySpell03", 0x00084D, kInjuryPlugin);
 
+		// Gourmet hangs every cooked-food bonus off these three regen effects. The
+		// marriage meal grants all three at once through its own copies.
+		const auto food = [&](std::string_view a_editorID, std::uint32_t a_localID, BuffAttribute a_attribute) {
+			foodBuff.Add(Lookup<RE::EffectSetting>(a_editorID, a_localID, kGourmetPlugin), a_attribute);
+		};
+		food("MAG_FoodFortifyHealthRegenBasic", 0x000800, BuffAttribute::kHealth);
+		food("MAG_FoodFortifyMagickaRegenBasic", 0x000802, BuffAttribute::kMagicka);
+		food("MAG_FoodFortifyStaminaRegenBasic", 0x000801, BuffAttribute::kStamina);
+		food("MAG_FoodFortifyHealthRegenMarriage", 0x00080A, BuffAttribute::kHealth);
+		food("MAG_FoodFortifyMagickaRegenMarriage", 0x00080B, BuffAttribute::kMagicka);
+		food("MAG_FoodFortifyStaminaRegenMarriage", 0x00080C, BuffAttribute::kStamina);
+
+		// Gourmet's survival stews warm you through Survival Mode's own effect, and
+		// some of them grant nothing else - without this they would show no timer.
+		foodBuff.Add(Lookup<RE::EffectSetting>("Survival_FoodFortifyWarmth", 0x002EE6, "Update.esm"),
+			BuffAttribute::kWarmth);
+
+		// Drink trades one pool for the other, so only the fortify half earns a badge.
+		const auto drink = [&](std::string_view a_editorID, std::uint32_t a_localID, BuffAttribute a_attribute) {
+			alcohol.Add(Lookup<RE::EffectSetting>(a_editorID, a_localID, kGourmetPlugin), a_attribute);
+		};
+		drink("MAG_AlcoholFortifyMagicka", 0x000804, BuffAttribute::kMagicka);
+		drink("MAG_AlcoholFortifyStamina", 0x000805, BuffAttribute::kStamina);
+		drink("MAG_AlcoholDamageStamina", 0x000803, BuffAttribute::kNone);
+		drink("MAG_AlcoholDamageMagicka", 0x000806, BuffAttribute::kNone);
+
+		// Every one of Pilgrim's 45 blessings carries exactly one of these two markers,
+		// and nothing else in the mod uses them - so they stand in for the whole set.
+		blessing.Add(Lookup<RE::EffectSetting>("MAG_PilgrimXPEffect", 0x1AEFAE, kPilgrimPlugin), BuffAttribute::kNone);
+		blessing.Add(Lookup<RE::EffectSetting>("MAG_CultistXPEffect", 0x1AEFB3, kPilgrimPlugin), BuffAttribute::kNone);
+
 		resolved = true;
 
-		SKSE::log::info("Form resolution: hunger={} sleep={} cold={} injuries={}",
+		SKSE::log::info("Form resolution: hunger={} sleep={} cold={} injuries={} food={} alcohol={} blessing={}",
 			hunger.value != nullptr,
 			sleep.value != nullptr,
 			cold.value != nullptr,
-			injurySpells[0] != nullptr);
+			injurySpells[0] != nullptr,
+			foodBuff.count,
+			alcohol.count,
+			blessing.count);
 	}
 
 	bool SurvivalData::SurvivalModeEnabled() const
@@ -121,6 +200,7 @@ namespace StarfrostWidgets
 		RefreshNeed(Gauge::kSleep, sleep);
 		RefreshNeed(Gauge::kCold, cold);
 		RefreshInjury();
+		RefreshBuffs();
 	}
 
 	void SurvivalData::RefreshNeed(Gauge a_gauge, const NeedForms& a_forms)
@@ -177,5 +257,78 @@ namespace StarfrostWidgets
 		state.maxValue = 3.0f;
 		state.fill = static_cast<float>(tier) / 3.0f;
 		state.stage = kTierToStage[tier];
+	}
+
+	void SurvivalData::RefreshBuffs()
+	{
+		constexpr Gauge kGauges[3] = { Gauge::kFoodBuff, Gauge::kAlcohol, Gauge::kBlessing };
+		const BuffForms* const kForms[3] = { &foodBuff, &alcohol, &blessing };
+
+		for (const auto gauge : kGauges) {
+			states[static_cast<std::size_t>(gauge)] = {};
+		}
+
+		const auto player = RE::PlayerCharacter::GetSingleton();
+		const auto target = player ? player->AsMagicTarget() : nullptr;
+		const auto active = target ? target->GetActiveEffectList() : nullptr;
+		if (!active) {
+			return;
+		}
+
+		BuffAccumulator accumulators[3]{};
+
+		// One pass over the list, matched against all three gauges as we go.
+		for (const auto effect : *active) {
+			if (!effect || effect->flags.any(RE::ActiveEffect::Flag::kInactive, RE::ActiveEffect::Flag::kDispelled)) {
+				continue;
+			}
+
+			const auto base = effect->GetBaseObject();
+			if (!base || effect->duration <= 0.0f) {
+				continue;
+			}
+
+			const float remaining = effect->duration - effect->elapsedSeconds;
+			if (remaining <= 0.0f) {
+				continue;
+			}
+
+			for (std::size_t i = 0; i < 3; ++i) {
+				const auto& forms = *kForms[i];
+				for (std::size_t slot = 0; slot < forms.count; ++slot) {
+					if (forms.effects[slot].form != base) {
+						continue;
+					}
+
+					auto& accumulator = accumulators[i];
+					accumulator.attributes |= forms.effects[slot].attribute;
+
+					// The longest runner decides when the buff is really gone.
+					if (remaining > accumulator.remaining) {
+						accumulator.remaining = remaining;
+						accumulator.duration = effect->duration;
+						accumulator.label = effect->spell ? effect->spell->GetFullName() : nullptr;
+					}
+					break;
+				}
+			}
+		}
+
+		for (std::size_t i = 0; i < 3; ++i) {
+			const auto& accumulator = accumulators[i];
+			if (accumulator.remaining < 0.0f) {
+				continue;
+			}
+
+			auto& state = states[static_cast<std::size_t>(kGauges[i])];
+			state.available = true;
+			state.timer = true;
+			state.value = accumulator.remaining;
+			state.maxValue = std::max(accumulator.duration, 1.0f);
+			state.fill = std::clamp(accumulator.remaining / state.maxValue, 0.0f, 1.0f);
+			state.stage = StageFromRemaining(state.fill);
+			state.attributes = accumulator.attributes;
+			CopyLabel(state.label, accumulator.label);
+		}
 	}
 }
