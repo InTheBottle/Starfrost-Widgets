@@ -68,6 +68,11 @@ These read the same ramp backwards: the ring starts full and green when the buff
 lands and empties towards red as it runs out, so the pulse at the last stage is a
 warning that it is about to drop. The remaining time is printed underneath.
 
+With **Dynamic** off they hold their spot on the HUD while nothing is running,
+drawn as a dim grey icon on an empty ring with no timer under it, so the layout
+does not shuffle every time a buff lands or expires. A widget whose source mod is
+not installed at all still draws nothing.
+
 Because a single food effect does not tell you the whole story, the food and
 alcohol widgets carry a badge row for what is currently fortified — a red circle
 for health, a blue diamond for magicka, a green triangle for stamina, an orange
@@ -117,7 +122,10 @@ can see what it will look like when it does turn up.
 On the needs and injuries that means it appears as things get worse. On the buff
 timers the ramp runs backwards, so it means it appears as the buff runs down: a
 Blessing widget set to stage 4 stays hidden for most of its eight hours and shows
-up when it is nearly gone.
+up when it is nearly gone, and it goes away again once the buff expires.
+
+Untick it and the widget is on screen from the moment the game loads, whatever it
+has to say.
 
 Every widget still draws while edit mode is open regardless, so a hidden one can
 always be repositioned.

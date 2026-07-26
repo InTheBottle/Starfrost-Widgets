@@ -290,6 +290,7 @@ namespace StarfrostWidgets
 		}
 
 		state.available = true;
+		state.active = true;
 		state.value = a_forms.value->value;
 		state.maxValue = std::max(ValueOr(a_forms.maxValue, 1.0f), 1.0f);
 		state.fill = std::clamp(state.value / state.maxValue, 0.0f, 1.0f);
@@ -324,6 +325,7 @@ namespace StarfrostWidgets
 		constexpr std::size_t kTierToStage[4] = { 0, 2, 4, 5 };
 
 		state.available = true;
+		state.active = true;
 		state.tiered = true;
 		state.value = static_cast<float>(tier);
 		state.maxValue = 3.0f;
@@ -337,8 +339,11 @@ namespace StarfrostWidgets
 		constexpr Gauge kGauges[3] = { Gauge::kFoodBuff, Gauge::kAlcohol, Gauge::kBlessing };
 		const BuffForms* const kForms[3] = { &foodBuff, &alcohol, &blessing };
 
-		for (const auto gauge : kGauges) {
-			states[static_cast<std::size_t>(gauge)] = {};
+		for (std::size_t i = 0; i < 3; ++i) {
+			auto& state = states[static_cast<std::size_t>(kGauges[i])];
+			state = {};
+			state.available = kForms[i]->Resolved();
+			state.timer = true;
 		}
 
 		const auto player = RE::PlayerCharacter::GetSingleton();
@@ -391,8 +396,7 @@ namespace StarfrostWidgets
 			}
 
 			auto& state = states[static_cast<std::size_t>(kGauges[i])];
-			state.available = true;
-			state.timer = true;
+			state.active = true;
 			state.value = accumulator.remaining;
 			state.maxValue = std::max(accumulator.duration, 1.0f);
 			state.fill = std::clamp(accumulator.remaining / state.maxValue, 0.0f, 1.0f);
@@ -412,6 +416,7 @@ namespace StarfrostWidgets
 		}
 
 		state.available = true;
+		state.active = true;
 		state.value = std::clamp(stress.value->value, 0.0f, kStressMax);
 		state.maxValue = kStressMax;
 		state.fill = state.value / kStressMax;

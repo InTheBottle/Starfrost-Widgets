@@ -176,6 +176,12 @@ WHAT THE BUFF TIMERS WATCH
   the food timer and Special Ingredients extends alcohol; the widget reads the
   effect's real duration, so a tripled buff simply shows a longer ring.
 
+  With Dynamic off, these three keep their place on the HUD while no buff is
+  running, drawn as a dim grey icon on an empty ring with no timer under it,
+  rather than disappearing and shoving the layout about every time a buff lands
+  or expires. A widget whose source mod is not installed still draws nothing at
+  all, so an install without Pilgrim does not get an idle Blessing widget.
+
 DYNAMIC WIDGETS
   A widget set to Dynamic stays off the HUD until it has something worth
   saying, then appears and grades up as usual. Tick Dynamic in the edit panel,
@@ -194,7 +200,11 @@ DYNAMIC WIDGETS
   On the need widgets, injuries and stress that means the widget appears as
   things get worse. On the buff timers the ramp runs backwards, so it means the
   widget appears as the buff runs down - a Blessing widget on stage 4 stays
-  hidden for most of its eight hours and turns up when it is nearly out.
+  hidden for most of its eight hours and turns up when it is nearly out, and
+  drops off the HUD again once the buff expires.
+
+  Untick it and the widget is on screen from the moment the game loads,
+  whatever it has to say.
 
   Every widget still shows while edit mode is open, whatever this is set to, so
   you can always position one you have hidden.
@@ -294,6 +304,10 @@ CHANGES IN 1.3.0
     next Combat Stress debuff rather than at some threshold of its own. It hides
     when the stress system is switched off in that mod's MCM, and ignores
     bRequireSurvivalMode. See WHAT THE STRESS WIDGET WATCHES above.
+  - Fixed the Food, Alcohol and Blessing widgets ignoring bDynamic. They only
+    ever drew while their buff was running, so unticking Dynamic did not keep
+    them on the HUD the way it does for every other widget. With Dynamic off
+    they now hold their place and idle as a dim grey icon between buffs.
 
 CHANGES IN 1.2.0
   - Dynamic widgets. Any widget can be set to stay off the HUD until it has

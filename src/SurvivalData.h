@@ -10,6 +10,7 @@ namespace StarfrostWidgets
 	struct GaugeState
 	{
 		bool          available{ false };
+		bool          active{ false };
 		bool          timer{ false };   // value/maxValue are seconds remaining / total
 		bool          tiered{ false };  // value is a 0-3 step, not a continuous reading
 		float         value{ 0.0f };    // raw need value, tier, or seconds left
@@ -66,6 +67,8 @@ namespace StarfrostWidgets
 
 			void Add(RE::EffectSetting* a_form, BuffAttribute a_attribute);
 			void AddKeyword(RE::BGSKeyword* a_keyword);
+
+			[[nodiscard]] bool Resolved() const { return count > 0 || keywordCount > 0; }
 
 			// The attribute mask if a_base belongs to this buff, nothing otherwise.
 			[[nodiscard]] std::optional<std::uint32_t> Match(const RE::EffectSetting* a_base) const;

@@ -34,6 +34,9 @@ namespace StarfrostWidgets::Widgets
 		constexpr ImU32 kBackingColor = IM_COL32(8, 8, 10, 120);
 		constexpr ImU32 kShadowColor = IM_COL32(0, 0, 0, 190);
 
+		constexpr ImU32 kIdleColor = IM_COL32(146, 143, 136, 255);
+		constexpr float kIdleAlpha = 0.45f;
+
 		// Set for one frame after the panel moves a widget; otherwise the window owns its position.
 		bool sPositionsDirty = true;
 
@@ -503,11 +506,12 @@ namespace StarfrostWidgets::Widgets
 		void DrawGaugeBody(ImDrawList* a_list, ImVec2 a_origin, ImVec2 a_size, Gauge a_gauge,
 			const WidgetSettings& a_widget, const GaugeState& a_state, const Settings& a_settings, float a_scale)
 		{
-			const ImU32 color = a_widget.stageColors[std::min(a_state.stage, kStageCount - 1)];
-			float       alpha = a_settings.opacity;
+			const bool  idle = a_state.timer && !a_state.active;
+			const ImU32 color = idle ? kIdleColor : a_widget.stageColors[std::min(a_state.stage, kStageCount - 1)];
+			float       alpha = a_settings.opacity * (idle ? kIdleAlpha : 1.0f);
 
 			// Only the top stage pulses; anything more and the HUD never settles.
-			if (a_settings.pulseAtCritical && a_state.stage >= kStageCount - 1) {
+			if (!idle && a_settings.pulseAtCritical && a_state.stage >= kStageCount - 1) {
 				const auto now = static_cast<float>(ImGui::GetTime());
 				alpha *= 0.62f + 0.38f * (0.5f + 0.5f * std::sin(now * 4.2f));
 			}
@@ -534,6 +538,9 @@ namespace StarfrostWidgets::Widgets
 			};
 
 			if (a_state.timer) {
+				if (idle) {
+					return;
+				}
 				if (a_settings.showAttributes) {
 					DrawAttributeBadges(a_list, a_origin, a_size, a_state, a_scale, alpha);
 				}
@@ -694,8 +701,10 @@ namespace StarfrostWidgets::Widgets
 					ImGui::Separator();
 
 					if (!state.available) {
-						ImGui::TextDisabled(isTimer ? "not running - no buff active or forms missing" :
+						ImGui::TextDisabled(isTimer ? "no source - the mod that grants this buff is not installed" :
 													  "no data - system off or forms missing");
+					} else if (state.timer && !state.active) {
+						ImGui::TextDisabled("idle - no buff running");
 					} else if (state.timer) {
 						ImGui::TextDisabled("%s   %s left of %s",
 							state.label[0] ? state.label : "active",

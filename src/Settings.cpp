@@ -186,7 +186,8 @@ namespace StarfrostWidgets
 				"; 0 = ring gauge, 1 = icon only, 2 = bar", false);
 			ini.SetBoolValue(section, "bDynamic", widget.dynamic,
 				"; Only draw this widget once it has something to say. Needs and injuries\n"
-				"; appear as they get worse; buff timers appear as they run down.");
+				"; appear as they get worse; buff timers appear as they run down. Off keeps\n"
+				"; the widget on screen always - buff timers idle as a dim icon.");
 			ini.SetLongValue(section, "iShowFromStage", static_cast<long>(widget.showFromStage),
 				"; The stage bDynamic starts drawing at, 1 - 5.", false);
 
