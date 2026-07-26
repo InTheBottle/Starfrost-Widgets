@@ -13,7 +13,7 @@ the ring starts full and green when the buff lands and empties towards red as it
 runs out, with the time left printed underneath. The food and alcohol widgets
 also badge what is currently fortified.
 
-Everything can be dragged into place in game.
+Everything can be dragged into place and recoloured in game.
 
 REQUIREMENTS
   - Skyrim Special Edition / Anniversary Edition
@@ -47,13 +47,24 @@ INSTALL
   No ESP/ESL plugin and no scripts. Safe to add or remove from a save at any
   time.
 
-MOVING THE WIDGETS
+MOVING AND RECOLOURING THE WIDGETS
   Press Insert in game. Your controls are parked, a cursor appears, and every
   widget becomes a box you can drag. A panel opens alongside them with style,
   scale, opacity and per-axis position for each widget, plus a live readout of
   what the game is currently reporting.
 
   Ctrl+click any slider to type an exact value instead of dragging for it.
+
+  Each widget also has six colour swatches, one per severity stage, running low
+  to high. That colour is what the icon, the ring and the bar are all drawn in,
+  so picking a colour recolours the whole widget. Click a swatch for the full
+  picker - hue bar, saturation square, and hex entry.
+
+    Reset colours        Put this widget back to the default green-to-red ramp.
+    Copy to all widgets  Give every widget this widget's six colours.
+
+  Set all six swatches to the same colour if you would rather a widget stayed
+  one colour instead of grading as things get worse.
 
   Press Insert again, or Esc, to leave. Settings are written back to the ini on
   the way out, so hand-editing the file and editing in game agree with each
@@ -105,7 +116,8 @@ SETTINGS
     sStage5Color          stage 5 (critical). Injuries have four states, so
                           they use stages 0, 2, 4 and 5. The buff timers run
                           the ramp backwards - a fresh buff is stage 0 and one
-                          about to expire is stage 5.
+                          about to expire is stage 5. Editable in game with a
+                          colour picker; see MOVING AND RECOLOURING above.
 
   Cold is off by default because Starfrost already gives it a vanilla HUD
   meter. Set bEnabled = true under [Cold] if you would rather use this one.
@@ -124,9 +136,10 @@ WHAT THE BUFF TIMERS WATCH
             gained.
 
   Blessing  Every one of Pilgrim's 45 shrine blessings, Aedric and Daedric
-            alike. They all carry one of two marker effects and nothing else in
-            the mod uses them, so there is no per-deity list that can fall out
-            of date. The edit panel names the blessing that is running.
+            alike, taken at a shrine or by praying. Each grants a different
+            boon, but all of those boons carry a shrine-blessing keyword, so
+            there is no per-deity list that can fall out of date. The edit panel
+            names the blessing that is running.
 
   Where more than one effect is running on a widget, the timer follows the one
   with the longest left, so it reads as "this buff is gone in X".
@@ -202,6 +215,9 @@ CHANGES IN 1.2.0
   - Three new widgets, all buff timers rather than need gauges: Food and
     Alcohol from Gourmet, and Blessing from Pilgrim. They only draw while the
     buff is running, count down as it expires, and print the time left.
+  - Colour pickers in the edit panel. Every widget's six stage colours can now
+    be set in game instead of by hand-editing RRGGBB values in the ini, with
+    Reset and Copy to all widgets alongside them.
   - Buff widgets badge what they fortify, so you can tell at a glance whether
     the twenty minutes left on your food is health, magicka, stamina or warmth.
   - bRequireSurvivalMode now only gates Hunger, Sleep and Cold. It had already

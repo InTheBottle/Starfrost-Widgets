@@ -490,6 +490,64 @@ namespace StarfrostWidgets::Widgets
 			}
 		}
 
+		// A bare swatch; clicking it opens ImGui's own picker popup.
+		void StageColorSwatch(const char* a_id, ImU32& a_color)
+		{
+			float rgb[3] = {
+				static_cast<float>((a_color >> IM_COL32_R_SHIFT) & 0xFF) / 255.0f,
+				static_cast<float>((a_color >> IM_COL32_G_SHIFT) & 0xFF) / 255.0f,
+				static_cast<float>((a_color >> IM_COL32_B_SHIFT) & 0xFF) / 255.0f
+			};
+
+			if (ImGui::ColorEdit3(a_id, rgb,
+					ImGuiColorEditFlags_NoInputs | ImGuiColorEditFlags_NoLabel | ImGuiColorEditFlags_NoAlpha)) {
+				a_color = IM_COL32(
+					static_cast<int>(rgb[0] * 255.0f + 0.5f),
+					static_cast<int>(rgb[1] * 255.0f + 0.5f),
+					static_cast<int>(rgb[2] * 255.0f + 0.5f),
+					0xFF);
+			}
+		}
+
+		// Six swatches in a row, low stage to high, plus the two edits worth having.
+		void DrawStageColors(Settings& a_settings, WidgetSettings& a_widget, bool a_isTimer)
+		{
+			ImGui::TextDisabled("Icon colours");
+			ImGui::SameLine();
+			ImGui::TextDisabled("(?)");
+			ImGui::SetItemTooltip(a_isTimer ?
+					"The icon, ring and bar all draw in the colour for the current stage.\n"
+					"Left to right: freshly applied through about to expire.\n"
+					"Click a swatch to pick a colour; set all six the same for a flat colour." :
+					"The icon, ring and bar all draw in the colour for the current stage.\n"
+					"Left to right: satisfied through critical.\n"
+					"Click a swatch to pick a colour; set all six the same for a flat colour.");
+
+			for (std::size_t stage = 0; stage < kStageCount; ++stage) {
+				if (stage > 0) {
+					ImGui::SameLine();
+				}
+				const auto id = std::format("##stagecolor{}", stage);
+				StageColorSwatch(id.c_str(), a_widget.stageColors[stage]);
+				ImGui::SetItemTooltip("Stage %d", static_cast<int>(stage));
+			}
+
+			if (ImGui::SmallButton("Reset colours")) {
+				for (std::size_t stage = 0; stage < kStageCount; ++stage) {
+					a_widget.stageColors[stage] = PackStageColor(kDefaultStageRamp[stage]);
+				}
+			}
+			ImGui::SameLine();
+			if (ImGui::SmallButton("Copy to all widgets")) {
+				for (std::size_t other = 0; other < kGaugeCount; ++other) {
+					for (std::size_t stage = 0; stage < kStageCount; ++stage) {
+						a_settings.widgets[other].stageColors[stage] = a_widget.stageColors[stage];
+					}
+				}
+			}
+			ImGui::SetItemTooltip("Give every widget this widget's six colours.");
+		}
+
 		void DrawControlPanel(Settings& a_settings)
 		{
 			ImGui::SetNextWindowSize({ 420.0f, 0.0f }, ImGuiCond_Appearing);
@@ -557,6 +615,9 @@ namespace StarfrostWidgets::Widgets
 					ImGui::SliderFloat("Scale", &widget.scale, 0.25f, 3.0f, "%.2f");
 					sPositionsDirty |= ImGui::SliderFloat("X", &widget.posX, 0.0f, 1.0f, "%.4f");
 					sPositionsDirty |= ImGui::SliderFloat("Y", &widget.posY, 0.0f, 1.0f, "%.4f");
+
+					DrawStageColors(a_settings, widget, isTimer);
+					ImGui::Separator();
 
 					if (!state.available) {
 						ImGui::TextDisabled(isTimer ? "not running - no buff active or forms missing" :

@@ -97,6 +97,31 @@ namespace StarfrostWidgets
 		}
 	}
 
+	void SurvivalData::BuffForms::AddKeyword(RE::BGSKeyword* a_keyword)
+	{
+		if (a_keyword && keywordCount < std::size(keywords)) {
+			keywords[keywordCount++] = a_keyword;
+		}
+	}
+
+	std::optional<std::uint32_t> SurvivalData::BuffForms::Match(const RE::EffectSetting* a_base) const
+	{
+		for (std::size_t i = 0; i < count; ++i) {
+			if (effects[i].form == a_base) {
+				return effects[i].attribute;
+			}
+		}
+
+		// Keyword-matched buffs are identified as a whole, not per attribute.
+		for (std::size_t i = 0; i < keywordCount; ++i) {
+			if (a_base->HasKeyword(keywords[i])) {
+				return static_cast<std::uint32_t>(BuffAttribute::kNone);
+			}
+		}
+
+		return std::nullopt;
+	}
+
 	void SurvivalData::ResolveForms()
 	{
 		survivalModeEnabled = LookupGlobal("Survival_ModeEnabled", 0x000826, kSurvivalPlugin);
@@ -162,10 +187,18 @@ namespace StarfrostWidgets
 		drink("MAG_AlcoholDamageStamina", 0x000803, BuffAttribute::kNone);
 		drink("MAG_AlcoholDamageMagicka", 0x000806, BuffAttribute::kNone);
 
-		// Every one of Pilgrim's 45 blessings carries exactly one of these two markers,
-		// and nothing else in the mod uses them - so they stand in for the whole set.
-		blessing.Add(Lookup<RE::EffectSetting>("MAG_PilgrimXPEffect", 0x1AEFAE, kPilgrimPlugin), BuffAttribute::kNone);
-		blessing.Add(Lookup<RE::EffectSetting>("MAG_CultistXPEffect", 0x1AEFB3, kPilgrimPlugin), BuffAttribute::kNone);
+		// Pilgrim's 45 blessings each grant a different boon, but every one of those
+		// boons carries a shrine-blessing keyword and none of them are conditional.
+		//
+		// The obvious hook - the MAG_PilgrimXPEffect / MAG_CultistXPEffect markers the
+		// blessings also share - is the wrong one: those are gated behind Pilgrim's
+		// anti-farming XP cooldown, so praying at a mat re-casts the blessing without
+		// them and the widget would see nothing.
+		//
+		// Pilgrim injects both keywords into Update.esm's form space, hence the plugin
+		// name here; the editor ID is what actually resolves them in practice.
+		blessing.AddKeyword(Lookup<RE::BGSKeyword>("MAG_PilgrimShrineBlessing", 0x616101, "Update.esm"));
+		blessing.AddKeyword(Lookup<RE::BGSKeyword>("MAG_CultistShrineBlessing", 0x616102, "Update.esm"));
 
 		resolved = true;
 
@@ -176,7 +209,7 @@ namespace StarfrostWidgets
 			injurySpells[0] != nullptr,
 			foodBuff.count,
 			alcohol.count,
-			blessing.count);
+			blessing.keywordCount);
 	}
 
 	bool SurvivalData::SurvivalModeEnabled() const
@@ -294,22 +327,19 @@ namespace StarfrostWidgets
 			}
 
 			for (std::size_t i = 0; i < 3; ++i) {
-				const auto& forms = *kForms[i];
-				for (std::size_t slot = 0; slot < forms.count; ++slot) {
-					if (forms.effects[slot].form != base) {
-						continue;
-					}
+				const auto attribute = kForms[i]->Match(base);
+				if (!attribute) {
+					continue;
+				}
 
-					auto& accumulator = accumulators[i];
-					accumulator.attributes |= forms.effects[slot].attribute;
+				auto& accumulator = accumulators[i];
+				accumulator.attributes |= *attribute;
 
-					// The longest runner decides when the buff is really gone.
-					if (remaining > accumulator.remaining) {
-						accumulator.remaining = remaining;
-						accumulator.duration = effect->duration;
-						accumulator.label = effect->spell ? effect->spell->GetFullName() : nullptr;
-					}
-					break;
+				// The longest runner decides when the buff is really gone.
+				if (remaining > accumulator.remaining) {
+					accumulator.remaining = remaining;
+					accumulator.duration = effect->duration;
+					accumulator.label = effect->spell ? effect->spell->GetFullName() : nullptr;
 				}
 			}
 		}

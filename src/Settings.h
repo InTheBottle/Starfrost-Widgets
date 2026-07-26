@@ -47,6 +47,17 @@ namespace StarfrostWidgets
 	// 0 (satisfied) to 5 (critical), matching the Survival_*Stage1..5Value thresholds.
 	inline constexpr std::size_t kStageCount = 6;
 
+	// The ini stores the friendlier RRGGBB; ImU32 is packed ABGR.
+	[[nodiscard]] inline constexpr ImU32 PackStageColor(std::uint32_t a_rgb)
+	{
+		return IM_COL32((a_rgb >> 16) & 0xFF, (a_rgb >> 8) & 0xFF, a_rgb & 0xFF, 0xFF);
+	}
+
+	// Green through deep red.
+	inline constexpr std::uint32_t kDefaultStageRamp[kStageCount] = {
+		0x6FCF7F, 0xB7D96B, 0xE8C15A, 0xE3924A, 0xD4593C, 0xB3232B
+	};
+
 	enum class WidgetStyle : std::int32_t
 	{
 		kRing = 0,

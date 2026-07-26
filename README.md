@@ -24,7 +24,7 @@ These grade from green through red across six severity stages as the need climbs
 | --- | --- | --- |
 | Food | steaming bowl of soup | Gourmet's `MAG_FoodFortify{Health,Magicka,Stamina}Regen{Basic,Marriage}`, plus `Survival_FoodFortifyWarmth` |
 | Alcohol | mead bottle | Gourmet's `MAG_AlcoholFortify{Magicka,Stamina}` and their paired drains |
-| Blessing | Shrine of Mara medallion | Pilgrim's `MAG_PilgrimXPEffect` / `MAG_CultistXPEffect` |
+| Blessing | Shrine of Mara medallion | anything carrying Pilgrim's `MAG_PilgrimShrineBlessing` / `MAG_CultistShrineBlessing` keyword |
 
 These read the same ramp backwards: the ring starts full and green when the buff
 lands and empties towards red as it runs out, so the pulse at the last stage is a
@@ -40,19 +40,32 @@ Warmth is in there because Gourmet's survival stews grant Survival Mode's own
 grant nothing else — without it those bowls would show no food timer at all.
 
 The blessing widget covers all 45 of Pilgrim's blessings, Aedric and Daedric
-alike: every one of them carries one of those two marker effects and nothing else
-in the mod uses them, so there is no per-deity list to keep in sync. Which
-blessing is running is named in the edit panel.
+alike, whether you took them at a shrine or by praying. Each blessing grants a
+different boon, but every one of those boons carries a shrine-blessing keyword,
+so there is no per-deity list to keep in sync. Which blessing is running is named
+in the edit panel.
+
+Matching the keyword rather than the `MAG_PilgrimXPEffect` / `MAG_CultistXPEffect`
+markers the blessings also share is deliberate. Those markers are gated behind
+Pilgrim's anti-farming XP cooldown, so praying re-casts the blessing without them
+and a widget keyed on them would show nothing. The boons themselves carry no
+conditions at all.
 
 Every widget can be drawn as a ring gauge, a bare icon, or a bar, and everything
-is moveable in game.
+is moveable and recolourable in game.
 
 ## Moving things around
 
 Press **Insert** (configurable) to enter edit mode. The player's controls are
 parked, a software cursor appears, and every widget becomes a draggable box.
-A panel gives you style, scale, opacity and per-axis position for each one, plus
-a live readout of what the game is currently reporting.
+A panel gives you style, scale, opacity, per-axis position and a colour picker
+for each of the six stages, plus a live readout of what the game is currently
+reporting.
+
+The six swatches under each widget are what the icon, ring and bar are drawn in
+at each severity stage. Set all six to the same colour if you would rather a
+widget did not change colour at all; "Copy to all widgets" pushes one widget's
+ramp onto the rest.
 
 Press **Insert** again or **Esc** to leave. Settings are written back to
 `Data/SKSE/Plugins/StarfrostWidgets.ini` on the way out, so hand-editing the ini

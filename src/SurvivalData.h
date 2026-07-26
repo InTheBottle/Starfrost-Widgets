@@ -54,12 +54,21 @@ namespace StarfrostWidgets
 		// Food carries the most: three regen effects, their marriage-meal twins, and warmth.
 		static constexpr std::size_t kMaxTrackedEffects = 8;
 
+		// A buff is recognised either by one of its base effects, or by a keyword that
+		// its effects carry - which is the only workable route when a mod spreads one
+		// buff over dozens of per-flavour effects, as Pilgrim does across 45 deities.
 		struct BuffForms
 		{
-			TrackedEffect effects[kMaxTrackedEffects]{};
-			std::size_t   count{ 0 };
+			TrackedEffect   effects[kMaxTrackedEffects]{};
+			std::size_t     count{ 0 };
+			RE::BGSKeyword* keywords[2]{};
+			std::size_t     keywordCount{ 0 };
 
 			void Add(RE::EffectSetting* a_form, BuffAttribute a_attribute);
+			void AddKeyword(RE::BGSKeyword* a_keyword);
+
+			// The attribute mask if a_base belongs to this buff, nothing otherwise.
+			[[nodiscard]] std::optional<std::uint32_t> Match(const RE::EffectSetting* a_base) const;
 		};
 
 		void RefreshNeed(Gauge a_gauge, const NeedForms& a_forms);

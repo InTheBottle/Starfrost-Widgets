@@ -10,16 +10,6 @@ namespace StarfrostWidgets
 			"Hunger", "Sleep", "Injury", "Cold", "FoodBuff", "Alcohol", "Blessing"
 		};
 
-		// Green through deep red.
-		constexpr std::uint32_t kDefaultRamp[kStageCount] = {
-			0x6FCF7F, 0xB7D96B, 0xE8C15A, 0xE3924A, 0xD4593C, 0xB3232B
-		};
-
-		[[nodiscard]] ImU32 PackRGB(std::uint32_t a_rgb)
-		{
-			return IM_COL32((a_rgb >> 16) & 0xFF, (a_rgb >> 8) & 0xFF, a_rgb & 0xFF, 0xFF);
-		}
-
 		[[nodiscard]] ImU32 ParseColor(const char* a_text, ImU32 a_fallback)
 		{
 			if (!a_text) {
@@ -40,12 +30,12 @@ namespace StarfrostWidgets
 				return a_fallback;
 			}
 
-			return PackRGB(rgb);
+			return PackStageColor(rgb);
 		}
 
 		[[nodiscard]] std::string FormatColor(ImU32 a_color)
 		{
-			// ImU32 is packed ABGR; the ini stores the friendlier RRGGBB.
+			// Back to the RRGGBB the ini stores.
 			return std::format("{:02X}{:02X}{:02X}",
 				(a_color >> IM_COL32_R_SHIFT) & 0xFF,
 				(a_color >> IM_COL32_G_SHIFT) & 0xFF,
@@ -74,7 +64,7 @@ namespace StarfrostWidgets
 			widget.style = WidgetStyle::kRing;
 			widget.hideWhenSatisfied = false;
 			for (std::size_t stage = 0; stage < kStageCount; ++stage) {
-				widget.stageColors[stage] = PackRGB(kDefaultRamp[stage]);
+				widget.stageColors[stage] = PackStageColor(kDefaultStageRamp[stage]);
 			}
 		}
 	}
