@@ -1,12 +1,12 @@
-Starfrost Widgets 1.2.0
+Starfrost Widgets 1.3.0
 by bottle
 
-Live HUD widgets for Starfrost's survival needs, Blade & Blunt's injuries, and
-the timed buffs from Gourmet and Pilgrim.
+Live HUD widgets for Starfrost's survival needs, Blade & Blunt's injuries,
+Stress and Fear's stress, and the timed buffs from Gourmet and Pilgrim.
 
-Three need gauges - Hunger, Sleep and Injury - sit on the HUD and colour-grade
-from green to red as things get worse. A fourth, Cold, is included but switched
-off.
+Four need gauges - Hunger, Sleep, Injury and Stress - sit on the HUD and
+colour-grade from green to red as things get worse. A fifth, Cold, is included
+but switched off.
 
 Three buff timers - Food, Alcohol and Blessing - run the same ramp backwards:
 the ring starts full and green when the buff lands and empties towards red as it
@@ -22,6 +22,7 @@ REQUIREMENTS
   - Creation Club Survival Mode
   - Survival Mode Improved
   - Blade & Blunt, with bEnableInjuries = true (only for the Injury widget)
+  - Stress and Fear - A Dynamic Sanity System (only for the Stress widget)
   - Gourmet - A Cooking Overhaul (only for the Food and Alcohol widgets)
   - Pilgrim - A Religion Overhaul (only for the Blessing widget)
 
@@ -93,8 +94,9 @@ SETTINGS
     bHideWhenHUDHidden    Follow the game's own HUD visibility, so screenshots
                           taken with the HUD off stay clean.
     bRequireSurvivalMode  Only show Hunger, Sleep and Cold while Survival Mode
-                          is on. Injuries and the buff timers ignore this - they
-                          belong to other mods, not to Survival Mode.
+                          is on. Injuries, Stress and the buff timers ignore
+                          this - they belong to other mods, not to Survival
+                          Mode.
     bShowValues           Print the raw need value under each need widget.
     bShowTimers           Print the time left under each buff widget.
     bShowAttributes       Badge the buff widgets with what they fortify. Red
@@ -106,7 +108,7 @@ SETTINGS
     iRenderTarget         Where the overlay draws. See FRAME GENERATION below.
                           0 = auto, 1 = swap chain, 2 = game framebuffer.
 
-  [Hunger] [Sleep] [Injury] [Cold] [FoodBuff] [Alcohol] [Blessing]
+  [Hunger] [Sleep] [Injury] [Cold] [FoodBuff] [Alcohol] [Blessing] [Stress]
     bEnabled              Show this widget.
     fPosX, fPosY          Position as a fraction of screen size, 0.0 - 1.0,
                           measured to the widget's top-left corner.
@@ -128,6 +130,28 @@ SETTINGS
 
   The three buff widgets only draw while their buff is actually running, so
   they cost you nothing on screen the rest of the time.
+
+WHAT THE STRESS WIDGET WATCHES
+  Stress and Fear keeps your whole stress level in one global, Stress_Total,
+  running 0 to 100, and hangs four debuff abilities off bands of that number:
+
+    Minor Combat Stress      above 25
+    Moderate Combat Stress   above 45
+    Severe Combat Stress     above 65
+    Critical Combat Stress   above 85
+
+  The widget reads that global and grades on those same four thresholds, so the
+  colour changes at exactly the point the game hands you the next debuff. Stage 1
+  is the gap below 25 - stress you are carrying that has not cost you anything
+  yet - so all six colour swatches get used, and Dynamic with Show from stage 2
+  keeps the widget off the HUD until a debuff is actually live.
+
+  Turning the stress system off in the mod's MCM zeroes the total, which would
+  otherwise leave the widget sitting at a permanent, meaningless calm. It watches
+  Stress_Enabled as well and hides instead.
+
+  Fears are not covered. They are per-enemy-type flags that only matter while you
+  are fighting that enemy, so there is no gauge to draw for them.
 
 WHAT THE BUFF TIMERS WATCH
   Food      Gourmet's food regeneration effects - health, magicka and stamina,
@@ -167,10 +191,10 @@ DYNAMIC WIDGETS
     4  Getting serious.
     5  Only at critical, right before it starts to hurt.
 
-  On the need widgets and injuries that means the widget appears as things get
-  worse. On the buff timers the ramp runs backwards, so it means the widget
-  appears as the buff runs down - a Blessing widget on stage 4 stays hidden for
-  most of its eight hours and turns up when it is nearly out.
+  On the need widgets, injuries and stress that means the widget appears as
+  things get worse. On the buff timers the ramp runs backwards, so it means the
+  widget appears as the buff runs down - a Blessing widget on stage 4 stays
+  hidden for most of its eight hours and turns up when it is nearly out.
 
   Every widget still shows while edit mode is open, whatever this is set to, so
   you can always position one you have hidden.
@@ -234,7 +258,7 @@ VERIFYING IT LOADED
   A working load looks like:
     info: StarfrostWidgets loaded
     info: Loaded settings from Data/SKSE/Plugins/StarfrostWidgets.ini
-    info: Form resolution: hunger=true sleep=true cold=true injuries=true food=7 alcohol=4 blessing=2
+    info: Form resolution: hunger=true sleep=true cold=true injuries=true food=7 alcohol=4 blessing=2 stress=true
     info: Hunger source: Survival Mode need value
     info: Input poll hook installed
     info: Present hook installed
@@ -262,6 +286,14 @@ NOTES
   - Drawing is done on the swap chain's Present call, and input comes from
     SKSE's own input events rather than a window hook. That keeps this out of
     ENB's and ReShade's way.
+
+CHANGES IN 1.3.0
+  - New widget: Stress, drawn as a skull, for Stress and Fear - A Dynamic Sanity
+    System. It reads the mod's Stress_Total global and grades on the mod's own
+    four debuff bands, so the colour changes at the point the game hands you the
+    next Combat Stress debuff rather than at some threshold of its own. It hides
+    when the stress system is switched off in that mod's MCM, and ignores
+    bRequireSurvivalMode. See WHAT THE STRESS WIDGET WATCHES above.
 
 CHANGES IN 1.2.0
   - Dynamic widgets. Any widget can be set to stay off the HUD until it has

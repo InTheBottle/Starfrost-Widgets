@@ -3,7 +3,8 @@
 An SKSE plugin that puts live HUD widgets on screen for
 [Starfrost](https://www.nexusmods.com/skyrimspecialedition/mods/93732)'s survival
 needs, [Blade & Blunt](https://www.nexusmods.com/skyrimspecialedition/mods/49015)'s
-injuries, and the timed buffs from
+injuries, [Stress and Fear](https://www.nexusmods.com/skyrimspecialedition/mods/116522)'s
+stress, and the timed buffs from
 [Gourmet](https://www.nexusmods.com/skyrimspecialedition/mods/60063) and
 [Pilgrim](https://www.nexusmods.com/skyrimspecialedition/mods/45557).
 
@@ -14,9 +15,28 @@ injuries, and the timed buffs from
 | Hunger | drumstick | `Survival_HungerNeedValue` + the `Survival_HungerStage1..5Value` thresholds, or Starfrost's own hunger abilities — see below |
 | Sleep | crescent moon | `Survival_ExhaustionNeedValue` + `Survival_ExhaustionStage1..5Value` |
 | Injury | cracked heart | `MAG_InjurySpell01/02/03` on the player |
+| Stress | skull | Stress and Fear's `Stress_Total`, gated on `Stress_Enabled` |
 | Cold *(optional, off by default)* | snowflake | `Survival_ColdNeedValue` + `Survival_ColdStage1..5Value` |
 
 These grade from green through red across six severity stages as the need climbs.
+
+#### Stress
+
+Stress and Fear keeps one 0-100 total in `Stress_Total` and hangs four debuff
+abilities off it, each conditioned on a band of that number: Minor Combat Stress
+above 25, Moderate above 45, Severe above 65, Critical above 85. The widget reads
+the global and uses those same four thresholds, so the colour it draws in changes
+at exactly the point the game hands you the next debuff. Stage 1 is the gap below
+25 — stress you are carrying that has not cost you anything yet — which means the
+whole six-colour ramp gets used and `bDynamic` with **Show from stage** 2 hides
+the widget until a debuff is actually live.
+
+Turning the stress system off in the mod's MCM sets `Stress_Enabled` to 0 and
+zeroes the total, so the widget watches that global too rather than sitting at a
+permanent, meaningless calm.
+
+Fears are not covered. They are per-enemy-type flags that only matter while you
+are fighting that enemy, so there is no gauge to draw.
 
 #### Which hunger
 
@@ -117,6 +137,7 @@ change.
 - Survival Mode Improved (for the exhaustion and cold stage thresholds, and the
   per-need enable switches)
 - Blade & Blunt with `bEnableInjuries = true` — only needed for the injury widget
+- Stress and Fear — A Dynamic Sanity System — only needed for the stress widget
 - Gourmet — A Cooking Overhaul — only needed for the food and alcohol widgets
 - Pilgrim — A Religion Overhaul — only needed for the blessing widget
 

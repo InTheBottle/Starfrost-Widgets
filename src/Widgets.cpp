@@ -10,7 +10,7 @@ namespace StarfrostWidgets::Widgets
 	namespace
 	{
 		constexpr const char* kNames[kGaugeCount] = {
-			"Hunger", "Sleep", "Injury", "Cold", "Food", "Alcohol", "Blessing"
+			"Hunger", "Sleep", "Injury", "Cold", "Food", "Alcohol", "Blessing", "Stress"
 		};
 
 		// Health, magicka, stamina - the Skyrim bar colours, near enough - then warmth.
@@ -276,6 +276,46 @@ namespace StarfrostWidgets::Widgets
 			a_list->AddCircleFilled(a_center, a_radius * 0.19f, a_color, 20);
 		}
 
+		void DrawStressIcon(ImDrawList* a_list, ImVec2 a_center, float a_radius, ImU32 a_color)
+		{
+			const ImU32 hollow = WithAlpha(IM_COL32(14, 11, 12, 255), AlphaOf(a_color) * 0.92f);
+
+			const float jawHalf = a_radius * 0.36f;
+			a_list->AddCircleFilled({ a_center.x, a_center.y - a_radius * 0.22f }, a_radius * 0.72f, a_color, 32);
+
+			const ImVec2 cheeks[4] = {
+				{ a_center.x - a_radius * 0.645f, a_center.y + a_radius * 0.10f },
+				{ a_center.x - a_radius * 0.46f, a_center.y + a_radius * 0.46f },
+				{ a_center.x + a_radius * 0.46f, a_center.y + a_radius * 0.46f },
+				{ a_center.x + a_radius * 0.645f, a_center.y + a_radius * 0.10f }
+			};
+			a_list->AddConvexPolyFilled(cheeks, 4, a_color);
+
+			a_list->AddRectFilled({ a_center.x - jawHalf, a_center.y + a_radius * 0.38f },
+				{ a_center.x + jawHalf, a_center.y + a_radius * 0.84f },
+				a_color, a_radius * 0.16f, ImDrawFlags_RoundCornersBottom);
+
+			for (const float side : { -1.0f, 1.0f }) {
+				a_list->AddCircleFilled({ a_center.x + side * a_radius * 0.33f, a_center.y - a_radius * 0.20f },
+					a_radius * 0.245f, hollow, 18);
+			}
+
+			a_list->AddTriangleFilled(
+				{ a_center.x - a_radius * 0.10f, a_center.y + a_radius * 0.04f },
+				{ a_center.x + a_radius * 0.10f, a_center.y + a_radius * 0.04f },
+				{ a_center.x, a_center.y + a_radius * 0.28f },
+				hollow);
+
+			const float biteY = a_center.y + a_radius * 0.46f;
+			a_list->AddLine({ a_center.x - a_radius * 0.30f, biteY }, { a_center.x + a_radius * 0.30f, biteY },
+				hollow, std::max(1.0f, a_radius * 0.065f));
+			for (int tooth = -1; tooth <= 1; ++tooth) {
+				const float x = a_center.x + static_cast<float>(tooth) * a_radius * 0.15f;
+				a_list->AddLine({ x, biteY }, { x, a_center.y + a_radius * 0.76f },
+					hollow, std::max(1.0f, a_radius * 0.075f));
+			}
+		}
+
 		// Circle, diamond, triangle and square, so the four stay apart by shape as well
 		// as by colour - at badge size the shape is what actually carries.
 		void DrawAttributeBadge(ImDrawList* a_list, std::uint32_t a_index, ImVec2 a_center, float a_radius, float a_alpha)
@@ -361,6 +401,9 @@ namespace StarfrostWidgets::Widgets
 				break;
 			case Gauge::kBlessing:
 				DrawBlessingIcon(a_list, a_center, a_radius, a_color);
+				break;
+			case Gauge::kStress:
+				DrawStressIcon(a_list, a_center, a_radius, a_color);
 				break;
 			case Gauge::kCold:
 			default:
@@ -571,7 +614,7 @@ namespace StarfrostWidgets::Widgets
 			ImGui::SameLine();
 			ImGui::Checkbox("Follow HUD", &a_settings.hideWhenHUDHidden);
 			ImGui::Checkbox("Only in Survival Mode", &a_settings.requireSurvivalMode);
-			ImGui::SetItemTooltip("Applies to hunger, sleep and cold. Injuries and buff timers always show.");
+			ImGui::SetItemTooltip("Applies to hunger, sleep and cold. Injuries, stress and buff timers always show.");
 			ImGui::SameLine();
 			ImGui::Checkbox("Show values", &a_settings.showValues);
 			ImGui::Checkbox("Pulse at critical", &a_settings.pulseAtCritical);

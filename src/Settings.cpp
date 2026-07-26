@@ -7,7 +7,7 @@ namespace StarfrostWidgets
 	namespace
 	{
 		constexpr const char* kSections[kGaugeCount] = {
-			"Hunger", "Sleep", "Injury", "Cold", "FoodBuff", "Alcohol", "Blessing"
+			"Hunger", "Sleep", "Injury", "Cold", "FoodBuff", "Alcohol", "Blessing", "Stress"
 		};
 
 		[[nodiscard]] ImU32 ParseColor(const char* a_text, ImU32 a_fallback)
@@ -52,7 +52,7 @@ namespace StarfrostWidgets
 	{
 		// Stacked down the left edge, clear of the compass and the vanilla meters.
 		constexpr float kDefaultY[kGaugeCount] = {
-			0.300f, 0.375f, 0.450f, 0.525f, 0.600f, 0.675f, 0.750f
+			0.300f, 0.375f, 0.450f, 0.525f, 0.600f, 0.675f, 0.750f, 0.825f
 		};
 
 		for (std::size_t i = 0; i < kGaugeCount; ++i) {

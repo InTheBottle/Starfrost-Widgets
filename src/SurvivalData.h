@@ -72,9 +72,16 @@ namespace StarfrostWidgets
 			[[nodiscard]] std::optional<std::uint32_t> Match(const RE::EffectSetting* a_base) const;
 		};
 
+		struct StressForms
+		{
+			RE::TESGlobal* value{ nullptr };
+			RE::TESGlobal* enabled{ nullptr };
+		};
+
 		void RefreshNeed(Gauge a_gauge, const NeedForms& a_forms);
 		void RefreshHunger();
 		void RefreshBuffs();
+		void RefreshStress();
 
 		// Three abilities standing in for a 0-3 severity ladder.
 		void RefreshTiers(Gauge a_gauge, RE::SpellItem* const (&a_spells)[3]);
@@ -84,6 +91,7 @@ namespace StarfrostWidgets
 		NeedForms      hunger{};
 		NeedForms      sleep{};
 		NeedForms      cold{};
+		StressForms    stress{};
 		RE::TESGlobal* survivalModeEnabled{ nullptr };
 		RE::SpellItem* injurySpells[3]{};  // minor, major, critical
 		RE::SpellItem* hungerSpells[3]{};  // Starfrost's Hungry, Very Hungry, Famished

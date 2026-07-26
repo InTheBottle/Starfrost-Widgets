@@ -10,6 +10,10 @@ namespace StarfrostWidgets
 		constexpr const char* kGourmetPlugin = "Gourmet.esp";
 		constexpr const char* kPilgrimPlugin = "Pilgrim.esp";
 		constexpr const char* kStarfrostPlugin = "Starfrost.esp";
+		constexpr const char* kStressPlugin = "Stress and Fear.esp";
+
+		constexpr float kStressThresholds[5] = { 0.0f, 25.0f, 45.0f, 65.0f, 85.0f };
+		constexpr float kStressMax = 100.0f;
 
 		// Editor IDs survive Starfrost's overrides; plugin + form id is the fallback.
 		template <class T>
@@ -46,6 +50,19 @@ namespace StarfrostWidgets
 			std::size_t stage = 0;
 			for (std::size_t i = 0; i < 5; ++i) {
 				if (a_stages[i] && a_value >= a_stages[i]->value) {
+					stage = i + 1;
+				} else {
+					break;
+				}
+			}
+			return stage;
+		}
+
+		[[nodiscard]] std::size_t StageFromStress(float a_value)
+		{
+			std::size_t stage = 0;
+			for (std::size_t i = 0; i < std::size(kStressThresholds); ++i) {
+				if (a_value > kStressThresholds[i]) {
 					stage = i + 1;
 				} else {
 					break;
@@ -158,6 +175,9 @@ namespace StarfrostWidgets
 		cold.currentStage = LookupGlobal("SMI_CurrentColdStage", 0x000D1E, kSMIPlugin);
 		cold.shouldBeEnabled = LookupGlobal("SMI_ColdShouldBeEnabled", 0x000F28, kSMIPlugin);
 
+		stress.value = LookupGlobal("Stress_Total", 0x000801, kStressPlugin);
+		stress.enabled = LookupGlobal("Stress_Enabled", 0x0008A5, kStressPlugin);
+
 		injurySpells[0] = Lookup<RE::SpellItem>("MAG_InjurySpell01", 0x00084A, kInjuryPlugin);
 		injurySpells[1] = Lookup<RE::SpellItem>("MAG_InjurySpell02", 0x00084B, kInjuryPlugin);
 		injurySpells[2] = Lookup<RE::SpellItem>("MAG_InjurySpell03", 0x00084D, kInjuryPlugin);
@@ -206,14 +226,15 @@ namespace StarfrostWidgets
 
 		resolved = true;
 
-		SKSE::log::info("Form resolution: hunger={} sleep={} cold={} injuries={} food={} alcohol={} blessing={}",
+		SKSE::log::info("Form resolution: hunger={} sleep={} cold={} injuries={} food={} alcohol={} blessing={} stress={}",
 			hunger.value != nullptr,
 			sleep.value != nullptr,
 			cold.value != nullptr,
 			injurySpells[0] != nullptr,
 			foodBuff.count,
 			alcohol.count,
-			blessing.keywordCount);
+			blessing.keywordCount,
+			stress.value != nullptr);
 
 		SKSE::log::info("Hunger source: {}",
 			UseHungerTiers() ? "Starfrost hunger abilities" : "Survival Mode need value");
@@ -246,6 +267,7 @@ namespace StarfrostWidgets
 		RefreshNeed(Gauge::kCold, cold);
 		RefreshTiers(Gauge::kInjury, injurySpells);
 		RefreshBuffs();
+		RefreshStress();
 	}
 
 	void SurvivalData::RefreshHunger()
@@ -383,5 +405,21 @@ namespace StarfrostWidgets
 			state.attributes = accumulator.attributes;
 			CopyLabel(state.label, accumulator.label);
 		}
+	}
+
+	void SurvivalData::RefreshStress()
+	{
+		auto& state = states[static_cast<std::size_t>(Gauge::kStress)];
+		state = {};
+
+		if (!stress.value || (stress.enabled && stress.enabled->value == 0.0f)) {
+			return;
+		}
+
+		state.available = true;
+		state.value = std::clamp(stress.value->value, 0.0f, kStressMax);
+		state.maxValue = kStressMax;
+		state.fill = state.value / kStressMax;
+		state.stage = StageFromStress(state.value);
 	}
 }
