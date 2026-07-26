@@ -148,6 +148,26 @@ WHAT THE BUFF TIMERS WATCH
   the food timer and Special Ingredients extends alcohol; the widget reads the
   effect's real duration, so a tripled buff simply shows a longer ring.
 
+WHICH HUNGER
+  Starfrost has shipped two different hunger systems. This works with both, and
+  there is nothing to set.
+
+  Builds that keep Creation Club Survival Mode's hunger meter are read straight
+  off Survival_HungerNeedValue, and the ring fills smoothly as you get hungrier.
+
+  Starfrost's public Nexus build replaced that meter with its own Hungry / Very
+  Hungry / Famished abilities and sets SMI_HungerShouldBeEnabled to 0, so the
+  need value never moves and a widget reading it stays hidden no matter how
+  hungry you get. That is the "hunger icon is not working" report.
+
+  Those abilities only exist on that build, so finding them is the test. When
+  they are there the widget reads the ability tier instead. It steps in thirds
+  rather than filling smoothly, because the countdowns between tiers are Papyrus
+  game-time timers with nothing readable to show.
+
+  The log line tells you which one it settled on:
+    info: Hunger source: Starfrost hunger abilities
+
 FRAME GENERATION
   Frame generation - Community Shaders' Upscaling feature, or any of the FSR3 /
   DLSS-G mods - swaps the game's swap chain for one of its own and composites
@@ -184,6 +204,7 @@ VERIFYING IT LOADED
     info: StarfrostWidgets loaded
     info: Loaded settings from Data/SKSE/Plugins/StarfrostWidgets.ini
     info: Form resolution: hunger=true sleep=true cold=true injuries=true food=7 alcohol=4 blessing=2
+    info: Hunger source: Survival Mode need value
     info: Input poll hook installed
     info: Present hook installed
     info: ImGui initialised
@@ -218,6 +239,15 @@ CHANGES IN 1.2.0
   - Colour pickers in the edit panel. Every widget's six stage colours can now
     be set in game instead of by hand-editing RRGGBB values in the ini, with
     Reset and Copy to all widgets alongside them.
+  - The Hunger widget works with Starfrost's public Nexus build. That build
+    replaced Survival Mode's hunger meter with its own Hungry / Very Hungry /
+    Famished abilities and switches SMI's hunger off, which left the widget
+    permanently hidden. It now detects which hunger system is in play and reads
+    whichever one is live, with nothing to configure.
+  - The Blessing widget picks up blessings taken by praying, not just at a
+    shrine. It had been keyed on Pilgrim's XP marker effects, which are gated
+    behind an anti-farming cooldown; it now matches the shrine-blessing keyword
+    the boons themselves carry, which nothing gates.
   - Buff widgets badge what they fortify, so you can tell at a glance whether
     the twenty minutes left on your food is health, magicka, stamina or warmth.
   - bRequireSurvivalMode now only gates Hunger, Sleep and Cold. It had already

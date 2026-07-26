@@ -10,8 +10,9 @@ namespace StarfrostWidgets
 	struct GaugeState
 	{
 		bool          available{ false };
-		bool          timer{ false };  // value/maxValue are seconds remaining / total
-		float         value{ 0.0f };   // raw need value, injury tier, or seconds left
+		bool          timer{ false };   // value/maxValue are seconds remaining / total
+		bool          tiered{ false };  // value is a 0-3 step, not a continuous reading
+		float         value{ 0.0f };    // raw need value, tier, or seconds left
 		float         maxValue{ 1.0f };
 		float         fill{ 0.0f };    // 0..1
 		std::size_t   stage{ 0 };      // 0 (satisfied) .. 5 (critical)
@@ -72,14 +73,20 @@ namespace StarfrostWidgets
 		};
 
 		void RefreshNeed(Gauge a_gauge, const NeedForms& a_forms);
-		void RefreshInjury();
+		void RefreshHunger();
 		void RefreshBuffs();
+
+		// Three abilities standing in for a 0-3 severity ladder.
+		void RefreshTiers(Gauge a_gauge, RE::SpellItem* const (&a_spells)[3]);
+
+		[[nodiscard]] bool UseHungerTiers() const;
 
 		NeedForms      hunger{};
 		NeedForms      sleep{};
 		NeedForms      cold{};
 		RE::TESGlobal* survivalModeEnabled{ nullptr };
 		RE::SpellItem* injurySpells[3]{};  // minor, major, critical
+		RE::SpellItem* hungerSpells[3]{};  // Starfrost's Hungry, Very Hungry, Famished
 
 		BuffForms foodBuff{};
 		BuffForms alcohol{};

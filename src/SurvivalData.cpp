@@ -9,6 +9,7 @@ namespace StarfrostWidgets
 		constexpr const char* kInjuryPlugin = "BladeAndBlunt.esp";
 		constexpr const char* kGourmetPlugin = "Gourmet.esp";
 		constexpr const char* kPilgrimPlugin = "Pilgrim.esp";
+		constexpr const char* kStarfrostPlugin = "Starfrost.esp";
 
 		// Editor IDs survive Starfrost's overrides; plugin + form id is the fallback.
 		template <class T>
@@ -160,6 +161,9 @@ namespace StarfrostWidgets
 		injurySpells[0] = Lookup<RE::SpellItem>("MAG_InjurySpell01", 0x00084A, kInjuryPlugin);
 		injurySpells[1] = Lookup<RE::SpellItem>("MAG_InjurySpell02", 0x00084B, kInjuryPlugin);
 		injurySpells[2] = Lookup<RE::SpellItem>("MAG_InjurySpell03", 0x00084D, kInjuryPlugin);
+		hungerSpells[0] = Lookup<RE::SpellItem>("MAG_HungerSpell01", 0x00084E, kStarfrostPlugin);
+		hungerSpells[1] = Lookup<RE::SpellItem>("MAG_HungerSpell02", 0x000856, kStarfrostPlugin);
+		hungerSpells[2] = Lookup<RE::SpellItem>("MAG_HungerSpell03", 0x000857, kStarfrostPlugin);
 
 		// Gourmet hangs every cooked-food bonus off these three regen effects. The
 		// marriage meal grants all three at once through its own copies.
@@ -210,6 +214,14 @@ namespace StarfrostWidgets
 			foodBuff.count,
 			alcohol.count,
 			blessing.keywordCount);
+
+		SKSE::log::info("Hunger source: {}",
+			UseHungerTiers() ? "Starfrost hunger abilities" : "Survival Mode need value");
+	}
+
+	bool SurvivalData::UseHungerTiers() const
+	{
+		return hungerSpells[0] != nullptr;
 	}
 
 	bool SurvivalData::SurvivalModeEnabled() const
@@ -229,11 +241,20 @@ namespace StarfrostWidgets
 			return;
 		}
 
-		RefreshNeed(Gauge::kHunger, hunger);
+		RefreshHunger();
 		RefreshNeed(Gauge::kSleep, sleep);
 		RefreshNeed(Gauge::kCold, cold);
-		RefreshInjury();
+		RefreshTiers(Gauge::kInjury, injurySpells);
 		RefreshBuffs();
+	}
+
+	void SurvivalData::RefreshHunger()
+	{
+		if (UseHungerTiers()) {
+			RefreshTiers(Gauge::kHunger, hungerSpells);
+		} else {
+			RefreshNeed(Gauge::kHunger, hunger);
+		}
 	}
 
 	void SurvivalData::RefreshNeed(Gauge a_gauge, const NeedForms& a_forms)
@@ -263,20 +284,20 @@ namespace StarfrostWidgets
 		                  StageFromThresholds(state.value, a_forms.stages);
 	}
 
-	void SurvivalData::RefreshInjury()
+	void SurvivalData::RefreshTiers(Gauge a_gauge, RE::SpellItem* const (&a_spells)[3])
 	{
-		auto& state = states[static_cast<std::size_t>(Gauge::kInjury)];
+		auto& state = states[static_cast<std::size_t>(a_gauge)];
+		state = {};
 
 		const auto player = RE::PlayerCharacter::GetSingleton();
-		if (!player || !injurySpells[0]) {
-			state = {};
+		if (!player || !a_spells[0]) {
 			return;
 		}
 
 		// Highest tier wins, whether or not the lower abilities stay attached.
 		std::size_t tier = 0;
 		for (std::size_t i = 3; i-- > 0;) {
-			if (injurySpells[i] && player->HasSpell(injurySpells[i])) {
+			if (a_spells[i] && player->HasSpell(a_spells[i])) {
 				tier = i + 1;
 				break;
 			}
@@ -286,10 +307,12 @@ namespace StarfrostWidgets
 		constexpr std::size_t kTierToStage[4] = { 0, 2, 4, 5 };
 
 		state.available = true;
+		state.tiered = true;
 		state.value = static_cast<float>(tier);
 		state.maxValue = 3.0f;
 		state.fill = static_cast<float>(tier) / 3.0f;
 		state.stage = kTierToStage[tier];
+		CopyLabel(state.label, tier ? a_spells[tier - 1]->GetFullName() : nullptr);
 	}
 
 	void SurvivalData::RefreshBuffs()

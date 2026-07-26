@@ -11,12 +11,30 @@ injuries, and the timed buffs from
 
 | Widget | Icon | Source |
 | --- | --- | --- |
-| Hunger | drumstick | `Survival_HungerNeedValue` + the `Survival_HungerStage1..5Value` thresholds |
+| Hunger | drumstick | `Survival_HungerNeedValue` + the `Survival_HungerStage1..5Value` thresholds, or Starfrost's own hunger abilities — see below |
 | Sleep | crescent moon | `Survival_ExhaustionNeedValue` + `Survival_ExhaustionStage1..5Value` |
 | Injury | cracked heart | `MAG_InjurySpell01/02/03` on the player |
 | Cold *(optional, off by default)* | snowflake | `Survival_ColdNeedValue` + `Survival_ColdStage1..5Value` |
 
 These grade from green through red across six severity stages as the need climbs.
+
+#### Which hunger
+
+Starfrost has shipped two different hunger systems and the widget handles both
+with no configuration.
+
+Builds that keep Creation Club Survival Mode's hunger meter are read straight off
+`Survival_HungerNeedValue`, and the ring fills smoothly.
+
+Starfrost's public Nexus build replaced that meter with its own **Hungry** /
+**Very Hungry** / **Famished** abilities and sets `SMI_HungerShouldBeEnabled` to
+0, so the need value never moves and the widget would stay hidden however hungry
+you got. Those abilities only exist on that build, so their presence is the test:
+find them and the widget reads the ability tier instead. It steps in thirds rather
+than filling smoothly, because the countdowns between tiers are Papyrus game-time
+timers with nothing readable to expose.
+
+The log records which one it settled on.
 
 ### Buff timers
 

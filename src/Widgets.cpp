@@ -483,7 +483,7 @@ namespace StarfrostWidgets::Widgets
 					caption(FormatDuration(a_state.value), 11.0f);
 				}
 			} else if (a_settings.showValues) {
-				caption(a_gauge == Gauge::kInjury ?
+				caption(a_state.tiered ?
 						std::format("{}/3", static_cast<int>(a_state.value)) :
 						std::format("{}", static_cast<int>(a_state.value)),
 					8.0f);
@@ -627,6 +627,10 @@ namespace StarfrostWidgets::Widgets
 							state.label[0] ? state.label : "active",
 							FormatDuration(state.value).c_str(),
 							FormatDuration(state.maxValue).c_str());
+					} else if (state.tiered) {
+						ImGui::TextDisabled("tier %d of 3   %s",
+							static_cast<int>(state.value),
+							state.label[0] ? state.label : "none");
 					} else {
 						ImGui::TextDisabled("stage %d   value %.0f / %.0f",
 							static_cast<int>(state.stage), state.value, state.maxValue);
