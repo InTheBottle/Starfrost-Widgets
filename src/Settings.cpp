@@ -107,6 +107,8 @@ namespace StarfrostWidgets
 		showValues = ini.GetBoolValue("General", "bShowValues", showValues);
 		pulseAtCritical = ini.GetBoolValue("General", "bPulseAtCritical", pulseAtCritical);
 		pollInterval = std::clamp(ReadFloat(ini, "General", "fPollInterval", pollInterval), 0.05f, 5.0f);
+		renderTarget = static_cast<RenderTarget>(std::clamp(
+			ini.GetLongValue("General", "iRenderTarget", static_cast<long>(renderTarget)), 0L, 2L));
 
 		for (std::size_t i = 0; i < kGaugeCount; ++i) {
 			const auto* section = kSections[i];
@@ -159,6 +161,11 @@ namespace StarfrostWidgets
 			"; Pulse the widget at the highest severity stage.");
 		ini.SetDoubleValue("General", "fPollInterval", pollInterval,
 			"; Seconds between reads of the game's need globals.");
+		ini.SetLongValue("General", "iRenderTarget", static_cast<long>(renderTarget),
+			"; Where the overlay draws. 0 = auto, 1 = swap chain back buffer,\n"
+			"; 2 = the game's framebuffer. Frame generation needs 0 or 2, because it\n"
+			"; composites the back buffer itself and would overwrite the widgets.",
+			false);
 
 		for (std::size_t i = 0; i < kGaugeCount; ++i) {
 			const auto* section = kSections[i];

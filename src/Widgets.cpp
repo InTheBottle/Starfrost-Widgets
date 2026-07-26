@@ -305,6 +305,7 @@ namespace StarfrostWidgets::Widgets
 			}
 
 			ImGui::TextWrapped("Drag a widget to move it. Press Esc or your edit key to finish - settings save automatically.");
+			ImGui::TextDisabled("Ctrl+click any slider to type an exact value.");
 			ImGui::Separator();
 
 			ImGui::Checkbox("Widgets enabled", &a_settings.enabled);
@@ -317,6 +318,16 @@ namespace StarfrostWidgets::Widgets
 			ImGui::SameLine();
 			ImGui::Checkbox("Show values", &a_settings.showValues);
 			ImGui::Checkbox("Pulse at critical", &a_settings.pulseAtCritical);
+
+			int target = static_cast<int>(a_settings.renderTarget);
+			if (ImGui::Combo("Draw into", &target, "Auto\0Swap chain\0Game framebuffer\0")) {
+				a_settings.renderTarget = static_cast<RenderTarget>(target);
+			}
+			ImGui::SetItemTooltip(
+				"Frame generation composites the back buffer itself, so widgets drawn there get\n"
+				"overwritten. Auto and Game framebuffer put them in the same layer as the vanilla\n"
+				"HUD, which survives that and is not interpolated. Switch to Swap chain only if\n"
+				"the widgets misbehave without frame generation.");
 
 			ImGui::Separator();
 

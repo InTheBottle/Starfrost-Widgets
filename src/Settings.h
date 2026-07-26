@@ -28,6 +28,21 @@ namespace StarfrostWidgets
 		kBar = 2    // horizontal bar with the icon to its left
 	};
 
+	// Which surface the overlay draws into.
+	//
+	// Frame generation replaces the game's swap chain with a proxy and composites
+	// the final image itself, so anything drawn straight into the back buffer is
+	// overwritten before it reaches the screen. Drawing into the game's own
+	// framebuffer render target instead puts the widgets in the same layer as the
+	// vanilla HUD, which the compositor does pick up - and which frame generation
+	// leaves un-interpolated, so they stay sharp.
+	enum class RenderTarget : std::int32_t
+	{
+		kAuto = 0,            // game framebuffer when it resolves, back buffer otherwise
+		kSwapChain = 1,       // always the swap chain back buffer
+		kGameFrameBuffer = 2  // always the game's framebuffer render target
+	};
+
 	struct WidgetSettings
 	{
 		bool         enabled{ true };
@@ -59,6 +74,7 @@ namespace StarfrostWidgets
 		bool          showValues{ false };
 		bool          pulseAtCritical{ true };
 		float         pollInterval{ 0.25f };  // seconds between game-data reads
+		RenderTarget  renderTarget{ RenderTarget::kAuto };
 
 		WidgetSettings widgets[kGaugeCount]{};
 
