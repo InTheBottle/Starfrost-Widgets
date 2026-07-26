@@ -12,6 +12,7 @@ namespace StarfrostWidgets::Widgets
 		constexpr const char* kNames[kGaugeCount] = {
 			"Hunger", "Sleep", "Injury", "Cold", "Food", "Alcohol", "Blessing", "Stress"
 		};
+		static_assert(kNames[kGaugeCount - 1] != nullptr, "A new Gauge needs a display name");
 
 		// Health, magicka, stamina - the Skyrim bar colours, near enough - then warmth.
 		constexpr ImU32 kAttributeColors[kBuffAttributeCount] = {
@@ -381,6 +382,14 @@ namespace StarfrostWidgets::Widgets
 			}
 		}
 
+		[[nodiscard]] std::size_t IconTier(const GaugeState& a_state)
+		{
+			if (a_state.tiered) {
+				return static_cast<std::size_t>(std::clamp(a_state.value, 0.0f, 3.0f));
+			}
+			return std::min(a_state.stage, kStageCount - 1) / 2;
+		}
+
 		void DrawIcon(ImDrawList* a_list, Gauge a_gauge, ImVec2 a_center, float a_radius, ImU32 a_color, std::size_t a_tier)
 		{
 			switch (a_gauge) {
@@ -430,7 +439,7 @@ namespace StarfrostWidgets::Widgets
 				a_list->PathStroke(WithAlpha(a_color, a_alpha), ImDrawFlags_None, thickness);
 			}
 
-			DrawIcon(a_list, a_gauge, center, outer * 0.62f, WithAlpha(a_color, a_alpha), a_state.stage ? a_state.stage / 2 : 0);
+			DrawIcon(a_list, a_gauge, center, outer * 0.62f, WithAlpha(a_color, a_alpha), IconTier(a_state));
 		}
 
 		void DrawIconGauge(ImDrawList* a_list, ImVec2 a_origin, ImVec2 a_size, Gauge a_gauge,
@@ -440,7 +449,7 @@ namespace StarfrostWidgets::Widgets
 			const float  outer = std::min(a_size.x, a_size.y) * 0.5f;
 
 			a_list->AddCircleFilled(center, outer, WithAlpha(kBackingColor, a_alpha * 0.6f), 32);
-			DrawIcon(a_list, a_gauge, center, outer * 0.78f, WithAlpha(a_color, a_alpha), a_state.stage ? a_state.stage / 2 : 0);
+			DrawIcon(a_list, a_gauge, center, outer * 0.78f, WithAlpha(a_color, a_alpha), IconTier(a_state));
 		}
 
 		void DrawBarGauge(ImDrawList* a_list, ImVec2 a_origin, ImVec2 a_size, Gauge a_gauge,
@@ -448,7 +457,7 @@ namespace StarfrostWidgets::Widgets
 		{
 			const float  iconRadius = a_size.y * 0.42f;
 			const ImVec2 iconCenter{ a_origin.x + iconRadius, a_origin.y + a_size.y * 0.5f };
-			DrawIcon(a_list, a_gauge, iconCenter, iconRadius, WithAlpha(a_color, a_alpha), a_state.stage ? a_state.stage / 2 : 0);
+			DrawIcon(a_list, a_gauge, iconCenter, iconRadius, WithAlpha(a_color, a_alpha), IconTier(a_state));
 
 			const float barLeft = a_origin.x + iconRadius * 2.3f;
 			const float barHeight = a_size.y * 0.42f;
@@ -471,14 +480,20 @@ namespace StarfrostWidgets::Widgets
 				return true;
 			}
 
-			// No HUD means a loading screen or the main menu.
-			if (!ui->IsMenuOpen(RE::HUDMenu::MENU_NAME)) {
+			const auto menus = Menus::GetSingleton();
+
+			// Not a covering menu: the loading screen keeps kAlwaysOpen throughout.
+			if (menus->LoadingScreenOpen()) {
+				return true;
+			}
+			// No HUD means the main menu.
+			if (!menus->HUDOpen()) {
 				return true;
 			}
 			if (a_settings.hideWhenHUDHidden && !ui->IsShowingMenus()) {
 				return true;
 			}
-			if (a_settings.hideInMenus && Menus::GetSingleton()->CoveringMenuOpen()) {
+			if (a_settings.hideInMenus && menus->CoveringMenuOpen()) {
 				return true;
 			}
 
@@ -488,8 +503,8 @@ namespace StarfrostWidgets::Widgets
 		void DrawGaugeBody(ImDrawList* a_list, ImVec2 a_origin, ImVec2 a_size, Gauge a_gauge,
 			const WidgetSettings& a_widget, const GaugeState& a_state, const Settings& a_settings, float a_scale)
 		{
-			ImU32 color = a_widget.stageColors[std::min(a_state.stage, kStageCount - 1)];
-			float alpha = a_settings.opacity;
+			const ImU32 color = a_widget.stageColors[std::min(a_state.stage, kStageCount - 1)];
+			float       alpha = a_settings.opacity;
 
 			// Only the top stage pulses; anything more and the HUD never settles.
 			if (a_settings.pulseAtCritical && a_state.stage >= kStageCount - 1) {

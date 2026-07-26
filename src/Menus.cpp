@@ -10,6 +10,16 @@ namespace StarfrostWidgets
 		} else {
 			SKSE::log::error("No UI singleton, menus will not hide the widgets");
 		}
+
+		Refresh();
+	}
+
+	void Menus::Refresh()
+	{
+		if (const auto ui = RE::UI::GetSingleton()) {
+			hudOpen.store(ui->IsMenuOpen(RE::HUDMenu::MENU_NAME), std::memory_order_relaxed);
+			loadingOpen.store(ui->IsMenuOpen(RE::LoadingMenu::MENU_NAME), std::memory_order_relaxed);
+		}
 	}
 
 	bool Menus::CoversScreen(const RE::BSFixedString& a_name)
@@ -56,6 +66,13 @@ namespace StarfrostWidgets
 	{
 		if (!a_event || !a_event->menuName.c_str()) {
 			return RE::BSEventNotifyControl::kContinue;
+		}
+
+		// Both carry kAlwaysOpen, so CoversScreen never counts either one.
+		if (a_event->menuName == RE::HUDMenu::MENU_NAME) {
+			hudOpen.store(a_event->opening, std::memory_order_relaxed);
+		} else if (a_event->menuName == RE::LoadingMenu::MENU_NAME) {
+			loadingOpen.store(a_event->opening, std::memory_order_relaxed);
 		}
 
 		if (a_event->opening) {

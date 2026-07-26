@@ -94,8 +94,10 @@ is moveable and recolourable in game.
 
 ## Moving things around
 
-Press **Insert** (configurable) to enter edit mode. The player's controls are
-parked, a software cursor appears, and every widget becomes a draggable box.
+Press **Insert** (configurable) in game to enter edit mode. The player's controls
+are parked, a software cursor appears, and every widget becomes a draggable box.
+It only opens where there is a HUD to arrange, so the key does nothing on the main
+menu or a loading screen, where it would park your controls with no way to see it.
 A panel gives you style, scale, opacity, per-axis position and a colour picker
 for each of the six stages, plus a live readout of what the game is currently
 reporting.

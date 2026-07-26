@@ -9,6 +9,7 @@ namespace StarfrostWidgets
 		constexpr const char* kSections[kGaugeCount] = {
 			"Hunger", "Sleep", "Injury", "Cold", "FoodBuff", "Alcohol", "Blessing", "Stress"
 		};
+		static_assert(kSections[kGaugeCount - 1] != nullptr, "A new Gauge needs an ini section name");
 
 		[[nodiscard]] ImU32 ParseColor(const char* a_text, ImU32 a_fallback)
 		{
@@ -54,6 +55,7 @@ namespace StarfrostWidgets
 		constexpr float kDefaultY[kGaugeCount] = {
 			0.300f, 0.375f, 0.450f, 0.525f, 0.600f, 0.675f, 0.750f, 0.825f
 		};
+		static_assert(kDefaultY[kGaugeCount - 1] != 0.0f, "A new Gauge needs a default position");
 
 		for (std::size_t i = 0; i < kGaugeCount; ++i) {
 			auto& widget = widgets[i];

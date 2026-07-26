@@ -23,6 +23,7 @@ namespace
 		case SKSE::MessagingInterface::kNewGame:
 			// Never resume into a save still in edit mode.
 			Input::GetSingleton()->LeaveEditMode();
+			Menus::GetSingleton()->Refresh();
 			SurvivalData::GetSingleton()->Refresh();
 			if (!Overlay::Installed()) {
 				Overlay::Install();  // the swap chain may have been late

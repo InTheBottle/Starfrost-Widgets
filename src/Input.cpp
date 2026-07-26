@@ -136,6 +136,14 @@ namespace StarfrostWidgets
 			}
 		}
 
+		// Edit mode parks the player's controls, so it must not open where there is no HUD
+		// to arrange - the main menu and loading screens, where it would only trap input.
+		[[nodiscard]] bool CanEnterEditMode()
+		{
+			const auto ui = RE::UI::GetSingleton();
+			return ui && ui->IsMenuOpen(RE::HUDMenu::MENU_NAME) && !ui->IsMenuOpen(RE::LoadingMenu::MENU_NAME);
+		}
+
 		// No char events without this, and the counter behind it is shared - pair every call.
 		void SetTextInputAllowed(bool a_allow)
 		{
@@ -217,8 +225,9 @@ namespace StarfrostWidgets
 		} else {
 			SetTextInputAllowed(false);
 			_wantTextInput.store(false, std::memory_order_relaxed);
-			// Release any held button, or the next edit session starts mid-drag.
-			Push({ .kind = QueuedEvent::Kind::kMouseButton, .button = 0, .down = false });
+			_leftCtrl = _rightCtrl = _leftShift = _rightShift = _leftAlt = _rightAlt = false;
+			// Release everything still held, or the next edit session starts mid-drag.
+			Push({ .kind = QueuedEvent::Kind::kReset });
 			Settings::GetSingleton()->Save();
 		}
 
@@ -258,7 +267,13 @@ namespace StarfrostWidgets
 		// While typing, Esc cancels the edit and a letter-bound toggle key is just a letter.
 		if (!typing) {
 			if (code == settings->editModeKey && a_button.IsDown()) {
-				SetEditMode(!editing);
+				if (editing) {
+					SetEditMode(false);
+				} else if (CanEnterEditMode()) {
+					SetEditMode(true);
+				} else {
+					SKSE::log::info("Edit mode ignored, no HUD to arrange");
+				}
 				return;
 			}
 			if (editing && code == kEscapeScanCode && a_button.IsDown()) {
@@ -284,23 +299,19 @@ namespace StarfrostWidgets
 		Push({ .kind = QueuedEvent::Kind::kKey, .down = down, .key = key });
 
 		// The merged modifier state is what makes ctrl+click open a slider's text box.
-		static bool leftCtrl = false, rightCtrl = false;
-		static bool leftShift = false, rightShift = false;
-		static bool leftAlt = false, rightAlt = false;
-
 		switch (key) {
-		case ImGuiKey_LeftCtrl: leftCtrl = down; break;
-		case ImGuiKey_RightCtrl: rightCtrl = down; break;
-		case ImGuiKey_LeftShift: leftShift = down; break;
-		case ImGuiKey_RightShift: rightShift = down; break;
-		case ImGuiKey_LeftAlt: leftAlt = down; break;
-		case ImGuiKey_RightAlt: rightAlt = down; break;
+		case ImGuiKey_LeftCtrl: _leftCtrl = down; break;
+		case ImGuiKey_RightCtrl: _rightCtrl = down; break;
+		case ImGuiKey_LeftShift: _leftShift = down; break;
+		case ImGuiKey_RightShift: _rightShift = down; break;
+		case ImGuiKey_LeftAlt: _leftAlt = down; break;
+		case ImGuiKey_RightAlt: _rightAlt = down; break;
 		default: return;
 		}
 
-		Push({ .kind = QueuedEvent::Kind::kKey, .down = leftCtrl || rightCtrl, .key = ImGuiMod_Ctrl });
-		Push({ .kind = QueuedEvent::Kind::kKey, .down = leftShift || rightShift, .key = ImGuiMod_Shift });
-		Push({ .kind = QueuedEvent::Kind::kKey, .down = leftAlt || rightAlt, .key = ImGuiMod_Alt });
+		Push({ .kind = QueuedEvent::Kind::kKey, .down = _leftCtrl || _rightCtrl, .key = ImGuiMod_Ctrl });
+		Push({ .kind = QueuedEvent::Kind::kKey, .down = _leftShift || _rightShift, .key = ImGuiMod_Shift });
+		Push({ .kind = QueuedEvent::Kind::kKey, .down = _leftAlt || _rightAlt, .key = ImGuiMod_Alt });
 	}
 
 	void Input::ProcessEvents(RE::InputEvent* const* a_events)
@@ -372,13 +383,13 @@ namespace StarfrostWidgets
 
 	void Input::PumpInto(ImGuiIO& a_io)
 	{
-		std::vector<QueuedEvent> drained;
+		_drained.clear();
 		{
 			const std::scoped_lock lock{ _queueLock };
-			drained.swap(_queue);
+			_drained.swap(_queue);
 		}
 
-		for (const auto& event : drained) {
+		for (const auto& event : _drained) {
 			switch (event.kind) {
 			case QueuedEvent::Kind::kMousePos:
 				a_io.AddMousePosEvent(event.x, event.y);
@@ -394,6 +405,11 @@ namespace StarfrostWidgets
 				break;
 			case QueuedEvent::Kind::kCharacter:
 				a_io.AddInputCharacter(event.codepoint);
+				break;
+			case QueuedEvent::Kind::kReset:
+				a_io.ClearEventsQueue();
+				a_io.ClearInputKeys();
+				a_io.ClearInputMouse();
 				break;
 			}
 		}

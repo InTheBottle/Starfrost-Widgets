@@ -251,11 +251,6 @@ namespace StarfrostWidgets
 		return !survivalModeEnabled || survivalModeEnabled->value != 0.0f;
 	}
 
-	bool SurvivalData::AnyNeedResolved() const
-	{
-		return hunger.value || sleep.value || cold.value || injurySpells[0];
-	}
-
 	void SurvivalData::Refresh()
 	{
 		if (!resolved) {

@@ -30,7 +30,6 @@ namespace StarfrostWidgets
 
 		[[nodiscard]] const GaugeState& Get(Gauge a_gauge) const { return states[static_cast<std::size_t>(a_gauge)]; }
 		[[nodiscard]] bool              SurvivalModeEnabled() const;
-		[[nodiscard]] bool              AnyNeedResolved() const;
 
 	private:
 		friend class REX::Singleton<SurvivalData>;

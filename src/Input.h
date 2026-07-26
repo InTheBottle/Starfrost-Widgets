@@ -44,7 +44,8 @@ namespace StarfrostWidgets
 				kMouseButton,
 				kMouseWheel,
 				kKey,
-				kCharacter
+				kCharacter,
+				kReset
 			};
 
 			Kind     kind{};
@@ -61,6 +62,14 @@ namespace StarfrostWidgets
 
 		std::mutex               _queueLock;
 		std::vector<QueuedEvent> _queue;
+		std::vector<QueuedEvent> _drained;
+
+		bool _leftCtrl{ false };
+		bool _rightCtrl{ false };
+		bool _leftShift{ false };
+		bool _rightShift{ false };
+		bool _leftAlt{ false };
+		bool _rightAlt{ false };
 
 		std::atomic<bool>  _editMode{ false };
 		std::atomic<bool>  _controlsParked{ false };

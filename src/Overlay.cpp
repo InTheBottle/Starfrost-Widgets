@@ -15,7 +15,7 @@ namespace StarfrostWidgets::Overlay
 
 		constexpr std::size_t kPresentVTableIndex = 8;
 
-		PresentFn               gOriginalPresent{ nullptr };
+		std::atomic<PresentFn>  gOriginalPresent{ nullptr };
 		ID3D11Device*           gDevice{ nullptr };
 		ID3D11DeviceContext*    gContext{ nullptr };
 		ID3D11RenderTargetView* gRenderTarget{ nullptr };
@@ -77,6 +77,7 @@ namespace StarfrostWidgets::Overlay
 
 			if (!ImGui_ImplDX11_Init(gDevice, gContext)) {
 				SKSE::log::error("ImGui_ImplDX11_Init failed");
+				ImGui::DestroyContext();
 				return false;
 			}
 
@@ -241,6 +242,10 @@ namespace StarfrostWidgets::Overlay
 
 		void RenderFrame(IDXGISwapChain* a_swapChain)
 		{
+			if (gGaveUp) {
+				return;
+			}
+
 			DXGI_SWAP_CHAIN_DESC desc{};
 			if (FAILED(a_swapChain->GetDesc(&desc))) {
 				return;
@@ -253,9 +258,6 @@ namespace StarfrostWidgets::Overlay
 			}
 
 			if (!gImGuiReady) {
-				if (gGaveUp) {
-					return;
-				}
 				if (!InitImGui(a_swapChain)) {
 					gGaveUp = true;  // do not thrash every frame
 					return;
@@ -320,6 +322,9 @@ namespace StarfrostWidgets::Overlay
 
 		HRESULT WINAPI HookedPresent(IDXGISwapChain* a_swapChain, UINT a_syncInterval, UINT a_flags)
 		{
+			// Published before the vtable write, so it is never null once we are reachable.
+			const auto original = gOriginalPresent.load(std::memory_order_acquire);
+
 			// Never let a drawing problem take the game down with it.
 			try {
 				RenderFrame(a_swapChain);
@@ -331,7 +336,7 @@ namespace StarfrostWidgets::Overlay
 				gGaveUp = true;
 			}
 
-			return gOriginalPresent(a_swapChain, a_syncInterval, a_flags);
+			return original(a_swapChain, a_syncInterval, a_flags);
 		}
 	}
 
@@ -361,7 +366,7 @@ namespace StarfrostWidgets::Overlay
 			return false;
 		}
 
-		gOriginalPresent = reinterpret_cast<PresentFn>(vtable[kPresentVTableIndex]);
+		gOriginalPresent.store(reinterpret_cast<PresentFn>(vtable[kPresentVTableIndex]), std::memory_order_release);
 		vtable[kPresentVTableIndex] = reinterpret_cast<void*>(&HookedPresent);
 
 		VirtualProtect(&vtable[kPresentVTableIndex], sizeof(void*), oldProtect, &oldProtect);
