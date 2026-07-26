@@ -8,17 +8,14 @@ namespace StarfrostWidgets
 	{
 		constexpr std::uint32_t kEscapeScanCode = 0x01;  // DIK_ESCAPE
 
-		// Skyrim's mouse button ids: 0/1/2 are the three buttons, 8 and 9 are the
-		// wheel notches.
+		// Skyrim mouse ids: 0/1/2 are the buttons, 8 and 9 are the wheel notches.
 		constexpr std::uint32_t kWheelUp = 8;
 		constexpr std::uint32_t kWheelDown = 9;
 
-		// Raw device deltas are roughly pixel-scaled already; this just takes the
-		// edge off so the cursor is not twitchy at high DPI.
+		// Raw device deltas are already roughly pixel-scaled.
 		constexpr float kCursorSensitivity = 1.0f;
 
-		// Fallback for when the poll hook could not be installed: stop the player
-		// swinging a sword or spinning the camera while dragging a widget around.
+		// Fallback for when the poll hook could not be installed.
 		constexpr RE::ControlMap::UEFlag kParkedControls = static_cast<RE::ControlMap::UEFlag>(
 			std::to_underlying(RE::ControlMap::UEFlag::kMovement) |
 			std::to_underlying(RE::ControlMap::UEFlag::kLooking) |
@@ -32,9 +29,7 @@ namespace StarfrostWidgets
 			std::to_underlying(RE::ControlMap::UEFlag::kConsole) |
 			std::to_underlying(RE::ControlMap::UEFlag::kVATS));
 
-		// DirectInput scan code to ImGuiKey. Typed text arrives separately as char
-		// events, so this only has to carry navigation, editing and the keys that
-		// take part in shortcuts - but the whole keyboard is cheap enough to map.
+		// Typed text arrives separately as char events; this is for navigation and shortcuts.
 		[[nodiscard]] ImGuiKey ScanCodeToImGuiKey(std::uint32_t a_code)
 		{
 			switch (a_code) {
@@ -141,9 +136,7 @@ namespace StarfrostWidgets
 			}
 		}
 
-		// The game normally never asks the keyboard device for character events.
-		// Turning them on is what makes typing into an ImGui field possible; the
-		// counter behind it is shared, so every enable needs its disable.
+		// No char events without this, and the counter behind it is shared - pair every call.
 		void SetTextInputAllowed(bool a_allow)
 		{
 			if (const auto controlMap = RE::ControlMap::GetSingleton()) {
@@ -151,8 +144,7 @@ namespace StarfrostWidgets
 			}
 		}
 
-		// Swallowing input at the source is cleaner than disabling controls: there
-		// is no game state left switched off if we never get to switch it back.
+		// Cleaner than disabling controls: no game state left off if we never switch it back.
 		struct PollInputDevices
 		{
 			static void thunk(RE::BSTEventSource<RE::InputEvent*>* a_dispatcher, RE::InputEvent* const* a_events)
@@ -181,9 +173,7 @@ namespace StarfrostWidgets
 		try {
 			const auto site = REL::RelocationID(67315, 68617).address() + REL::Relocate(0x7B, 0x7B);
 
-			// Only patch if there really is a near call here. On a runtime this
-			// offset does not fit, that check is the difference between falling
-			// back quietly and writing five bytes over the middle of something.
+			// A wrong offset would put five bytes through the middle of something.
 			if (*reinterpret_cast<const std::uint8_t*>(site) != 0xE8) {
 				SKSE::log::warn("No call instruction at the input poll site; falling back to an event sink");
 			} else {
@@ -219,8 +209,7 @@ namespace StarfrostWidgets
 		}
 
 		if (a_enable) {
-			// Start the cursor in the middle rather than wherever the last session
-			// left it, so it is always findable.
+			// Centre it so it is always findable.
 			_cursorX = _displayWidth.load(std::memory_order_relaxed) * 0.5f;
 			_cursorY = _displayHeight.load(std::memory_order_relaxed) * 0.5f;
 			Push({ .kind = QueuedEvent::Kind::kMousePos, .x = _cursorX, .y = _cursorY });
@@ -228,14 +217,12 @@ namespace StarfrostWidgets
 		} else {
 			SetTextInputAllowed(false);
 			_wantTextInput.store(false, std::memory_order_relaxed);
-			// Release any button ImGui still thinks is held, or the next edit
-			// session starts mid-drag.
+			// Release any held button, or the next edit session starts mid-drag.
 			Push({ .kind = QueuedEvent::Kind::kMouseButton, .button = 0, .down = false });
 			Settings::GetSingleton()->Save();
 		}
 
-		// Only needed when the poll hook is absent - it already stops the game
-		// seeing anything at all.
+		// The poll hook already stops the game seeing anything.
 		if (!_pollHookInstalled.load(std::memory_order_relaxed)) {
 			if (const auto controlMap = RE::ControlMap::GetSingleton()) {
 				const bool parked = _controlsParked.load(std::memory_order_relaxed);
@@ -268,8 +255,7 @@ namespace StarfrostWidgets
 		const bool  editing = EditMode();
 		const bool  typing = _wantTextInput.load(std::memory_order_relaxed);
 
-		// While a text field has the keyboard, Esc belongs to ImGui for cancelling
-		// the edit, and a letter-bound toggle key belongs to the field.
+		// While typing, Esc cancels the edit and a letter-bound toggle key is just a letter.
 		if (!typing) {
 			if (code == settings->editModeKey && a_button.IsDown()) {
 				SetEditMode(!editing);
@@ -297,8 +283,7 @@ namespace StarfrostWidgets
 		const bool down = a_button.IsDown();
 		Push({ .kind = QueuedEvent::Kind::kKey, .down = down, .key = key });
 
-		// ImGui wants the merged modifier state alongside the physical key, which
-		// is what makes ctrl+click on a slider open its text box.
+		// The merged modifier state is what makes ctrl+click open a slider's text box.
 		static bool leftCtrl = false, rightCtrl = false;
 		static bool leftShift = false, rightShift = false;
 		static bool leftAlt = false, rightAlt = false;
@@ -413,9 +398,8 @@ namespace StarfrostWidgets
 			}
 		}
 
+		// Park the cursor off-screen so nothing can be hovered while the widgets are inert.
 		if (!EditMode()) {
-			// Park the cursor off-screen so nothing can be hovered or clicked
-			// while the widgets are meant to be inert.
 			a_io.AddMousePosEvent(-FLT_MAX, -FLT_MAX);
 		}
 	}

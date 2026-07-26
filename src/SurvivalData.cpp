@@ -8,9 +8,7 @@ namespace StarfrostWidgets
 		constexpr const char* kSMIPlugin = "SurvivalModeImproved.esp";
 		constexpr const char* kInjuryPlugin = "BladeAndBlunt.esp";
 
-		// Editor IDs survive being overridden by Starfrost or any other patch, so
-		// they are the primary lookup. The plugin + local form id is only a fallback
-		// for the (unlikely) case that the editor id map has no entry.
+		// Editor IDs survive Starfrost's overrides; plugin + form id is the fallback.
 		template <class T>
 		[[nodiscard]] T* Lookup(std::string_view a_editorID, std::uint32_t a_localID, const char* a_plugin)
 		{
@@ -39,8 +37,7 @@ namespace StarfrostWidgets
 			return a_global ? a_global->value : a_fallback;
 		}
 
-		// Survival Mode counts a stage as reached once the need is >= that stage's
-		// threshold (Survival_NeedBase.IncrementNeed), so this mirrors that exactly.
+		// Mirrors Survival_NeedBase.IncrementNeed: a stage is reached at >= its threshold.
 		[[nodiscard]] std::size_t StageFromThresholds(float a_value, RE::TESGlobal* const (&a_stages)[5])
 		{
 			std::size_t stage = 0;
@@ -71,8 +68,7 @@ namespace StarfrostWidgets
 
 		sleep.value = LookupGlobal("Survival_ExhaustionNeedValue", 0x000816, kSurvivalPlugin);
 		sleep.maxValue = LookupGlobal("Survival_ExhaustionNeedMaxValue", 0x00084A, kSurvivalPlugin);
-		// The exhaustion and cold stage thresholds only exist as globals because
-		// Survival Mode Improved added them; vanilla kept them as script floats.
+		// Exhaustion and cold thresholds are only globals because SMI promoted them.
 		sleep.stages[0] = LookupGlobal("Survival_ExhaustionStage1Value", 0x000A17, kSMIPlugin);
 		sleep.stages[1] = LookupGlobal("Survival_ExhaustionStage2Value", 0x000A18, kSMIPlugin);
 		sleep.stages[2] = LookupGlobal("Survival_ExhaustionStage3Value", 0x000A19, kSMIPlugin);
@@ -106,8 +102,7 @@ namespace StarfrostWidgets
 
 	bool SurvivalData::SurvivalModeEnabled() const
 	{
-		// Without the global we cannot tell, so assume on rather than hiding
-		// everything and looking broken.
+		// Assume on when the global is missing, rather than hiding everything.
 		return !survivalModeEnabled || survivalModeEnabled->value != 0.0f;
 	}
 
@@ -148,8 +143,7 @@ namespace StarfrostWidgets
 		state.maxValue = std::max(ValueOr(a_forms.maxValue, 1.0f), 1.0f);
 		state.fill = std::clamp(state.value / state.maxValue, 0.0f, 1.0f);
 
-		// SMI keeps an authoritative cached stage; it sits at -1 until the need
-		// system has run at least once, and only then is it worth trusting.
+		// SMI's cached stage is authoritative, but sits at -1 until the need starts.
 		const float cached = ValueOr(a_forms.currentStage, -1.0f);
 		state.stage = cached >= 0.0f ?
 		                  static_cast<std::size_t>(std::clamp(cached, 0.0f, 5.0f)) :
@@ -166,8 +160,7 @@ namespace StarfrostWidgets
 			return;
 		}
 
-		// Highest tier wins, whether Blade & Blunt swaps the abilities out or
-		// leaves the lower ones attached.
+		// Highest tier wins, whether or not the lower abilities stay attached.
 		std::size_t tier = 0;
 		for (std::size_t i = 3; i-- > 0;) {
 			if (injurySpells[i] && player->HasSpell(injurySpells[i])) {
@@ -176,8 +169,7 @@ namespace StarfrostWidgets
 			}
 		}
 
-		// Three injury tiers spread over the shared six-stage colour ramp, so a
-		// critical injury reads as red just like a critical need does.
+		// Three tiers spread over the shared six-stage colour ramp.
 		constexpr std::size_t kTierToStage[4] = { 0, 2, 4, 5 };
 
 		state.available = true;

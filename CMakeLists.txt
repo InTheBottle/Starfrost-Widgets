@@ -15,8 +15,7 @@ set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 
 # ---- CommonLibSSE-NG ----
 set(BUILD_TESTS OFF CACHE BOOL "Disable CommonLib tests" FORCE)
-# Skyrim VR is out of scope: the overlay draws to the flat swap chain, which VR
-# does not present to. Turning it off also drops the openvr build dependency.
+# The overlay draws to the flat swap chain, which VR does not present to.
 set(ENABLE_SKYRIM_VR OFF CACHE BOOL "No VR support" FORCE)
 add_subdirectory(extern/CommonLibSSE-NG CommonLibSSE EXCLUDE_FROM_ALL)
 
@@ -78,8 +77,7 @@ target_precompile_headers(${PROJECT_NAME}
 		src/PCH.h
 )
 
-# Emit a PDB for Release too, so shipped builds can be read by crash loggers.
-# /OPT:REF /OPT:ICF undo the folding /DEBUG would otherwise disable.
+# A Release PDB for crash loggers; /OPT:REF /OPT:ICF undo what /DEBUG disables.
 if(MSVC)
 	target_compile_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Release>:/Zi>)
 	target_link_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Release>:/DEBUG /OPT:REF /OPT:ICF>)
@@ -99,8 +97,7 @@ if(DEFINED OUTPUT_FOLDER)
 		VERBATIM
 	)
 
-	# Every config produces a PDB now, so this needs no config check - and a
-	# check would be wrong anyway, since the VS generator is multi-config.
+	# No config check: every config emits a PDB, and the VS generator is multi-config.
 	add_custom_command(
 		TARGET ${PROJECT_NAME}
 		POST_BUILD
@@ -108,7 +105,7 @@ if(DEFINED OUTPUT_FOLDER)
 		VERBATIM
 	)
 
-	# copy_if_different, so a locally edited ini is not clobbered on every build.
+	# copy_if_different, so a locally edited ini survives a rebuild.
 	add_custom_command(
 		TARGET ${PROJECT_NAME}
 		POST_BUILD

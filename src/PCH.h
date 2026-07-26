@@ -1,9 +1,6 @@
 #pragma once
 
-// CommonLibSSE-NG mirrors the Win32 types itself in REX::W32 and refuses to
-// build if <Windows.h> was already pulled in, so it has to come first. The real
-// Windows headers are still needed for the D3D11 swap chain hook; every handle
-// that crosses between the two worlds goes through an explicit reinterpret_cast.
+// CommonLibSSE-NG refuses to build if <Windows.h> came first, so it leads.
 #include <RE/Skyrim.h>
 #include <REX/REX.h>
 #include <SKSE/SKSE.h>

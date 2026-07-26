@@ -10,22 +10,19 @@ namespace StarfrostWidgets::Widgets
 	{
 		constexpr const char* kNames[kGaugeCount] = { "Hunger", "Sleep", "Injury", "Cold" };
 
-		// Base pixel footprints at scale 1.0, sized against a 1080p HUD.
+		// Footprints at scale 1.0, sized against a 1080p HUD.
 		constexpr float kRingBox = 76.0f;
 		constexpr float kIconBox = 56.0f;
 		constexpr ImVec2 kBarBox{ 190.0f, 46.0f };
 
-		// imgui.h does not export IM_PI; that lives in imgui_internal.h and we do
-		// not need the rest of it.
+		// IM_PI lives in imgui_internal.h, which is not worth pulling in.
 		constexpr float kPi = 3.14159265358979323846f;
 
 		constexpr ImU32 kTrackColor = IM_COL32(12, 12, 14, 150);
 		constexpr ImU32 kBackingColor = IM_COL32(8, 8, 10, 120);
 		constexpr ImU32 kShadowColor = IM_COL32(0, 0, 0, 190);
 
-		// Panel positions are pushed into the widget windows for one frame after
-		// they change; the rest of the time the windows own their own position so
-		// dragging works.
+		// Set for one frame after the panel moves a widget; otherwise the window owns its position.
 		bool sPositionsDirty = true;
 
 		[[nodiscard]] ImVec2 operator+(const ImVec2& a_lhs, const ImVec2& a_rhs)
@@ -33,8 +30,7 @@ namespace StarfrostWidgets::Widgets
 			return { a_lhs.x + a_rhs.x, a_lhs.y + a_rhs.y };
 		}
 
-		// Everything in this file draws from the render thread. Game state must not
-		// be poked from there, so anything that does goes through SKSE's task queue.
+		// This file draws from the render thread, which must not poke game state.
 		template <class F>
 		void RunOnMainThread(F&& a_work)
 		{
@@ -68,14 +64,12 @@ namespace StarfrostWidgets::Widgets
 			const ImVec2 extent = font->CalcTextSizeA(a_size, FLT_MAX, 0.0f, a_text);
 			const ImVec2 pos{ a_center.x - extent.x * 0.5f, a_center.y - extent.y * 0.5f };
 
-			// Cheap outline, so the text stays readable over snow and over sky alike.
+			// Outline, so the text reads over snow and sky alike.
 			a_list->AddText(font, a_size, pos + ImVec2{ 1.0f, 1.0f }, WithAlpha(kShadowColor, (a_color >> IM_COL32_A_SHIFT & 0xFF) / 255.0f), a_text);
 			a_list->AddText(font, a_size, pos, a_color, a_text);
 		}
 
-		// --- icons -----------------------------------------------------------
-		// All of these draw inside a circle of the given radius around a_center,
-		// so a gauge can swap styles without the artwork changing size.
+		// Icons all draw inside a circle of a_radius around a_center.
 
 		void DrawHungerIcon(ImDrawList* a_list, ImVec2 a_center, float a_radius, ImU32 a_color)
 		{
@@ -115,7 +109,7 @@ namespace StarfrostWidgets::Widgets
 
 		void DrawInjuryIcon(ImDrawList* a_list, ImVec2 a_center, float a_radius, ImU32 a_color, std::size_t a_tier)
 		{
-			// Two lobes and a point make a heart; the crack grows with the tier.
+			// Two lobes and a point make a heart.
 			const float lobeRadius = a_radius * 0.31f;
 			a_list->AddCircleFilled({ a_center.x - a_radius * 0.29f, a_center.y - a_radius * 0.20f }, lobeRadius, a_color, 18);
 			a_list->AddCircleFilled({ a_center.x + a_radius * 0.29f, a_center.y - a_radius * 0.20f }, lobeRadius, a_color, 18);
@@ -129,7 +123,7 @@ namespace StarfrostWidgets::Widgets
 				return;
 			}
 
-			// A dark fissure punched through the middle. More tiers, wider crack.
+			// Wider crack for a worse tier.
 			const float width = a_radius * (0.09f + 0.04f * static_cast<float>(a_tier));
 			const ImVec2 crack[5] = {
 				{ a_center.x - a_radius * 0.02f, a_center.y - a_radius * 0.46f },
@@ -151,7 +145,7 @@ namespace StarfrostWidgets::Widgets
 				const ImVec2 tail{ a_center.x - axis.x * a_radius * 0.72f, a_center.y - axis.y * a_radius * 0.72f };
 				a_list->AddLine(tip, tail, a_color, thickness);
 
-				// Barbs at both ends turn three crossed lines into a snowflake.
+				// Barbs turn three crossed lines into a snowflake.
 				for (const float branch : { angle + kPi * 0.72f, angle - kPi * 0.72f }) {
 					const ImVec2 offset{ std::cos(branch) * a_radius * 0.26f, std::sin(branch) * a_radius * 0.26f };
 					a_list->AddLine(tip, tip + offset, a_color, thickness * 0.8f);
@@ -178,8 +172,6 @@ namespace StarfrostWidgets::Widgets
 				break;
 			}
 		}
-
-		// --- gauge bodies ----------------------------------------------------
 
 		void DrawRingGauge(ImDrawList* a_list, ImVec2 a_origin, ImVec2 a_size, Gauge a_gauge,
 			const GaugeState& a_state, ImU32 a_color, float a_alpha)
@@ -232,8 +224,6 @@ namespace StarfrostWidgets::Widgets
 					WithAlpha(a_color, a_alpha), rounding);
 			}
 		}
-
-		// --- frame -----------------------------------------------------------
 
 		[[nodiscard]] bool ShouldHideForUI(const Settings& a_settings)
 		{
@@ -363,8 +353,6 @@ namespace StarfrostWidgets::Widgets
 			}
 
 			ImGui::Separator();
-			// This runs on the render thread, so anything that writes a file or
-			// touches the control map is bounced to the main thread first.
 			if (ImGui::Button("Save now")) {
 				RunOnMainThread([]() { Settings::GetSingleton()->Save(); });
 			}
@@ -414,8 +402,7 @@ namespace StarfrostWidgets::Widgets
 				if (!state.available) {
 					continue;
 				}
-				// Injuries are Blade & Blunt's, not Survival Mode's, so they keep
-				// showing even with survival switched off.
+				// Injuries are Blade & Blunt's, so they ignore Survival Mode.
 				if (gauge != Gauge::kInjury && settings.requireSurvivalMode && !survivalOn) {
 					continue;
 				}
@@ -433,9 +420,7 @@ namespace StarfrostWidgets::Widgets
 				continue;
 			}
 
-			// Edit mode: a real window per widget, so ImGui handles the dragging.
-			// Always while the panel is driving the position, Appearing otherwise -
-			// which covers a widget being switched on part way through a session.
+			// A real window per widget, so ImGui handles the dragging.
 			const auto id = std::format("##sfw_gauge_{}", i);
 			ImGui::SetNextWindowPos(origin, sPositionsDirty ? ImGuiCond_Always : ImGuiCond_Appearing);
 			ImGui::SetNextWindowSize(size, ImGuiCond_Always);
@@ -457,7 +442,7 @@ namespace StarfrostWidgets::Widgets
 				AddCenteredText(list, { windowPos.x + size.x * 0.5f, windowPos.y - 9.0f },
 					ImGui::GetFontSize(), IM_COL32(255, 220, 160, 235), kNames[i]);
 
-				// Whatever the drag left us at becomes the new stored position.
+				// Wherever the drag left it becomes the stored position.
 				widget.posX = display.x > 0.0f ? windowPos.x / display.x : widget.posX;
 				widget.posY = display.y > 0.0f ? windowPos.y / display.y : widget.posY;
 			}

@@ -19,11 +19,11 @@ namespace
 
 		case SKSE::MessagingInterface::kPostLoadGame:
 		case SKSE::MessagingInterface::kNewGame:
-			// Never resume into a save with the player's controls still parked.
+			// Never resume into a save still in edit mode.
 			Input::GetSingleton()->LeaveEditMode();
 			SurvivalData::GetSingleton()->Refresh();
 			if (!Overlay::Installed()) {
-				Overlay::Install();  // retry, in case the swap chain was late
+				Overlay::Install();  // the swap chain may have been late
 			}
 			break;
 
@@ -40,7 +40,6 @@ SKSEPluginInfo(
 
 SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 {
-	// Init sets up the log file and pattern for us.
 	SKSE::Init(a_skse);
 
 	// One write_call<5> for the input poll hook, with room to spare.

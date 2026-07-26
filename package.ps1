@@ -1,9 +1,4 @@
-# Builds the release configuration and stages a Nexus-ready archive in dist\.
-#
-# The archive is rooted at the game's Data folder, so a mod manager can install
-# it without any repackaging. The PDB ships alongside the DLL so crash loggers
-# can produce readable stack traces; users are told in README.txt that it is
-# optional.
+# Builds release and stages a mod-manager-ready archive in dist\, rooted at Data.
 
 [CmdletBinding()]
 param(
@@ -25,9 +20,7 @@ if (-not $Version) {
     $Version = $Matches[1]
 }
 
-# CommonLibSSE prints its options banner to stderr, and with ErrorActionPreference
-# set to Stop that alone would abort the script. Native tools are judged on their
-# exit code instead.
+# CommonLibSSE banners to stderr, which ErrorActionPreference=Stop would treat as fatal.
 function Invoke-Native([string] $What, [scriptblock] $Command) {
     $previous = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
@@ -45,7 +38,7 @@ $built = Join-Path $repo 'build\release\Release'
 $stage = Join-Path $repo "dist\StarfrostWidgets-$Version"
 $plugins = Join-Path $stage 'SKSE\Plugins'
 
-# Start from empty so a rename or a dropped file cannot linger in the archive.
+# Start empty so a renamed or dropped file cannot linger in the archive.
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $plugins | Out-Null
 

@@ -6,24 +6,18 @@ namespace StarfrostWidgets
 {
 	struct GaugeState
 	{
-		bool        available{ false };  // forms resolved and the system is switched on
-		float       value{ 0.0f };       // raw need value, or injury tier for kInjury
+		bool        available{ false };
+		float       value{ 0.0f };  // raw need value, or injury tier for kInjury
 		float       maxValue{ 1.0f };
-		float       fill{ 0.0f };  // 0..1, for the gauge sweep
+		float       fill{ 0.0f };  // 0..1
 		std::size_t stage{ 0 };    // 0 (satisfied) .. 5 (critical)
 	};
 
-	// Reads Starfrost's needs straight out of the Survival Mode / Survival Mode
-	// Improved global variables, and injuries out of Blade & Blunt's tiered
-	// injury abilities. Nothing here writes to the game.
+	// Read-only: needs from the Survival Mode globals, injuries from Blade & Blunt's abilities.
 	class SurvivalData : public REX::Singleton<SurvivalData>
 	{
 	public:
-		// Resolves every form. Safe to call again if a load order changes.
 		void ResolveForms();
-
-		// Re-reads the live values. Cheap: a handful of global reads plus three
-		// HasSpell checks, throttled by Settings::pollInterval at the call site.
 		void Refresh();
 
 		[[nodiscard]] const GaugeState& Get(Gauge a_gauge) const { return states[static_cast<std::size_t>(a_gauge)]; }
@@ -34,14 +28,12 @@ namespace StarfrostWidgets
 		friend class REX::Singleton<SurvivalData>;
 		SurvivalData() = default;
 
-		// One need's worth of globals. Cold, hunger and exhaustion are identical
-		// in shape, which is why Survival Mode's papyrus shares a base script.
 		struct NeedForms
 		{
 			RE::TESGlobal* value{ nullptr };
 			RE::TESGlobal* maxValue{ nullptr };
 			RE::TESGlobal* stages[5]{};
-			RE::TESGlobal* currentStage{ nullptr };  // SMI's cached stage, -1 until it starts
+			RE::TESGlobal* currentStage{ nullptr };  // SMI's cache, -1 until it starts
 			RE::TESGlobal* shouldBeEnabled{ nullptr };
 		};
 

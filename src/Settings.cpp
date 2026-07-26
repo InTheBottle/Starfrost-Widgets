@@ -8,8 +8,7 @@ namespace StarfrostWidgets
 	{
 		constexpr const char* kSections[kGaugeCount] = { "Hunger", "Sleep", "Injury", "Cold" };
 
-		// Green through deep red. Stage 0 is only ever seen when the user opts to
-		// keep a satisfied gauge on screen, so it stays a calm green rather than grey.
+		// Green through deep red.
 		constexpr std::uint32_t kDefaultRamp[kStageCount] = {
 			0x6FCF7F, 0xB7D96B, 0xE8C15A, 0xE3924A, 0xD4593C, 0xB3232B
 		};
@@ -59,8 +58,7 @@ namespace StarfrostWidgets
 
 	Settings::Settings()
 	{
-		// Stacked down the left edge by default, clear of the compass and the
-		// vanilla survival meters.
+		// Stacked down the left edge, clear of the compass and the vanilla meters.
 		constexpr float kDefaultY[kGaugeCount] = { 0.300f, 0.375f, 0.450f, 0.525f };
 
 		for (std::size_t i = 0; i < kGaugeCount; ++i) {
@@ -90,8 +88,7 @@ namespace StarfrostWidgets
 
 		const auto path = IniPath();
 		if (const auto rc = ini.LoadFile(path.string().c_str()); rc < 0) {
-			// A missing ini is the normal first-run case: keep the constructor's
-			// defaults and write them out so the user has something to edit.
+			// First run: write the defaults out so there is something to edit.
 			SKSE::log::info("No ini at {}, writing defaults", path.string());
 			Save();
 			return;

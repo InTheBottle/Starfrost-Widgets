@@ -2,8 +2,7 @@
 
 namespace StarfrostWidgets
 {
-	// The four things we can draw. Hunger/Sleep/Injury are on by default; Cold is
-	// shipped disabled because Starfrost's cold already has a vanilla HUD meter.
+	// Cold ships disabled - Starfrost already gives it a vanilla HUD meter.
 	enum class Gauge : std::size_t
 	{
 		kHunger = 0,
@@ -16,38 +15,29 @@ namespace StarfrostWidgets
 
 	inline constexpr std::size_t kGaugeCount = static_cast<std::size_t>(Gauge::kTotal);
 
-	// Needs report a severity of 0 (satisfied) through 5 (critical), matching the
-	// Survival_*Stage1..5Value thresholds. Injuries only reach 3, and get remapped
-	// onto this scale so every gauge can share one colour ramp.
+	// 0 (satisfied) to 5 (critical), matching the Survival_*Stage1..5Value thresholds.
 	inline constexpr std::size_t kStageCount = 6;
 
 	enum class WidgetStyle : std::int32_t
 	{
-		kRing = 0,  // radial gauge with the icon in the middle
-		kIcon = 1,  // icon only, tinted by severity
-		kBar = 2    // horizontal bar with the icon to its left
+		kRing = 0,
+		kIcon = 1,
+		kBar = 2
 	};
 
-	// Which surface the overlay draws into.
-	//
-	// Frame generation replaces the game's swap chain with a proxy and composites
-	// the final image itself, so anything drawn straight into the back buffer is
-	// overwritten before it reaches the screen. Drawing into the game's own
-	// framebuffer render target instead puts the widgets in the same layer as the
-	// vanilla HUD, which the compositor does pick up - and which frame generation
-	// leaves un-interpolated, so they stay sharp.
+	// Frame generation composites the back buffer itself and would overwrite what we draw there.
 	enum class RenderTarget : std::int32_t
 	{
-		kAuto = 0,            // game framebuffer when it resolves, back buffer otherwise
-		kSwapChain = 1,       // always the swap chain back buffer
-		kGameFrameBuffer = 2  // always the game's framebuffer render target
+		kAuto = 0,
+		kSwapChain = 1,
+		kGameFrameBuffer = 2
 	};
 
 	struct WidgetSettings
 	{
 		bool         enabled{ true };
-		float        posX{ 0.03f };  // normalized to screen width, top-left of the widget box
-		float        posY{ 0.30f };  // normalized to screen height
+		float        posX{ 0.03f };  // fraction of screen size, top-left of the widget box
+		float        posY{ 0.30f };
 		float        scale{ 1.0f };
 		WidgetStyle  style{ WidgetStyle::kRing };
 		bool         hideWhenSatisfied{ false };
@@ -63,7 +53,6 @@ namespace StarfrostWidgets
 		[[nodiscard]] WidgetSettings&       Widget(Gauge a_gauge) { return widgets[static_cast<std::size_t>(a_gauge)]; }
 		[[nodiscard]] const WidgetSettings& Widget(Gauge a_gauge) const { return widgets[static_cast<std::size_t>(a_gauge)]; }
 
-		// [General]
 		bool          enabled{ true };
 		std::uint32_t editModeKey{ 0xD2 };  // DIK_INSERT
 		float         globalScale{ 1.0f };
@@ -73,7 +62,7 @@ namespace StarfrostWidgets
 		bool          requireSurvivalMode{ true };
 		bool          showValues{ false };
 		bool          pulseAtCritical{ true };
-		float         pollInterval{ 0.25f };  // seconds between game-data reads
+		float         pollInterval{ 0.25f };
 		RenderTarget  renderTarget{ RenderTarget::kAuto };
 
 		WidgetSettings widgets[kGaugeCount]{};
