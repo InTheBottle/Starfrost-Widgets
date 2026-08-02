@@ -1,5 +1,6 @@
 #include "Input.h"
 
+#include "Menus.h"
 #include "Settings.h"
 
 namespace StarfrostWidgets
@@ -136,12 +137,19 @@ namespace StarfrostWidgets
 			}
 		}
 
-		// Edit mode parks the player's controls, so it must not open where there is no HUD
-		// to arrange - the main menu and loading screens, where it would only trap input.
 		[[nodiscard]] bool CanEnterEditMode()
 		{
 			const auto ui = RE::UI::GetSingleton();
-			return ui && ui->IsMenuOpen(RE::HUDMenu::MENU_NAME) && !ui->IsMenuOpen(RE::LoadingMenu::MENU_NAME);
+			if (!ui || !ui->IsMenuOpen(RE::HUDMenu::MENU_NAME) || ui->IsMenuOpen(RE::LoadingMenu::MENU_NAME)) {
+				return false;
+			}
+
+			// Character creation runs over a live HUD, so the HUD alone does not mean gameplay.
+			if (ui->IsMenuOpen(RE::RaceSexMenu::MENU_NAME) || ui->GameIsPaused()) {
+				return false;
+			}
+
+			return !Menus::GetSingleton()->CoveringMenuOpen();
 		}
 
 		// No char events without this, and the counter behind it is shared - pair every call.
@@ -272,7 +280,7 @@ namespace StarfrostWidgets
 				} else if (CanEnterEditMode()) {
 					SetEditMode(true);
 				} else {
-					SKSE::log::info("Edit mode ignored, no HUD to arrange");
+					SKSE::log::info("Edit mode ignored, no arrangeable HUD right now");
 				}
 				return;
 			}

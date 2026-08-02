@@ -37,8 +37,23 @@ namespace StarfrostWidgets::Widgets
 		constexpr ImU32 kIdleColor = IM_COL32(146, 143, 136, 255);
 		constexpr float kIdleAlpha = 0.45f;
 
+		constexpr float kFadeInSeconds = 0.60f;
+		constexpr float kFadeOutSeconds = 0.20f;
+
+		// The screen fade has to have been over for this long before the widgets start rising.
+		constexpr float kFadeSettleSeconds = 0.40f;
+
+		// A ceiling on the hold, so a fade flag we misread can never keep the widgets off.
+		constexpr float kFadeHoldSeconds = 5.0f;
+
 		// Set for one frame after the panel moves a widget; otherwise the window owns its position.
 		bool sPositionsDirty = true;
+
+		float sFade = 0.0f;
+		float sHoldRemaining = 0.0f;
+		float sSettleRemaining = 0.0f;
+		bool  sWasLoading = false;
+		bool  sWasHUDOpen = false;
 
 		[[nodiscard]] ImVec2 operator+(const ImVec2& a_lhs, const ImVec2& a_rhs)
 		{
@@ -251,8 +266,7 @@ namespace StarfrostWidgets::Widgets
 
 		void DrawBlessingIcon(ImDrawList* a_list, ImVec2 a_center, float a_radius, ImU32 a_color)
 		{
-			// Mara's shrine medallion: two concentric bands, four knotwork petals
-			// crossing the inner one on the cardinals, and a plain boss at the middle.
+			// Mara's shrine medallion: two bands, four knotwork petals, a plain boss.
 			a_list->AddCircle(a_center, a_radius * 0.95f, a_color, 32, a_radius * 0.14f);
 			a_list->AddCircle(a_center, a_radius * 0.55f, a_color, 28, a_radius * 0.085f);
 
@@ -320,8 +334,7 @@ namespace StarfrostWidgets::Widgets
 			}
 		}
 
-		// Circle, diamond, triangle and square, so the four stay apart by shape as well
-		// as by colour - at badge size the shape is what actually carries.
+		// At badge size the shape carries further than the colour does.
 		void DrawAttributeBadge(ImDrawList* a_list, std::uint32_t a_index, ImVec2 a_center, float a_radius, float a_alpha)
 		{
 			const ImU32 fill = WithAlpha(kAttributeColors[a_index], a_alpha);
@@ -503,12 +516,43 @@ namespace StarfrostWidgets::Widgets
 			return false;
 		}
 
+		// Loading screens and the HUD coming up both start a fresh entrance.
+		float UpdateFade(bool a_visible, float a_deltaTime)
+		{
+			const auto menus = Menus::GetSingleton();
+			const bool loading = menus->LoadingScreenOpen();
+			const bool hudOpen = menus->HUDOpen();
+
+			if ((sWasLoading && !loading) || (!sWasHUDOpen && hudOpen)) {
+				sHoldRemaining = kFadeHoldSeconds;
+				sSettleRemaining = kFadeSettleSeconds;
+			}
+			sWasLoading = loading;
+			sWasHUDOpen = hudOpen;
+
+			if (sHoldRemaining > 0.0f) {
+				sHoldRemaining -= a_deltaTime;
+				sSettleRemaining = menus->ScreenFading() ?
+				                       kFadeSettleSeconds :
+				                       sSettleRemaining - a_deltaTime;
+				if (sSettleRemaining <= 0.0f) {
+					sHoldRemaining = 0.0f;
+				}
+			}
+
+			const bool  rising = a_visible && sHoldRemaining <= 0.0f;
+			const float step = rising ? a_deltaTime / kFadeInSeconds : -a_deltaTime / kFadeOutSeconds;
+
+			sFade = std::clamp(sFade + step, 0.0f, 1.0f);
+			return sFade;
+		}
+
 		void DrawGaugeBody(ImDrawList* a_list, ImVec2 a_origin, ImVec2 a_size, Gauge a_gauge,
 			const WidgetSettings& a_widget, const GaugeState& a_state, const Settings& a_settings, float a_scale)
 		{
 			const bool  idle = a_state.timer && !a_state.active;
 			const ImU32 color = idle ? kIdleColor : a_widget.stageColors[std::min(a_state.stage, kStageCount - 1)];
-			float       alpha = a_settings.opacity * (idle ? kIdleAlpha : 1.0f);
+			float       alpha = a_settings.opacity * sFade * (idle ? kIdleAlpha : 1.0f);
 
 			// Only the top stage pulses; anything more and the HUD never settles.
 			if (!idle && a_settings.pulseAtCritical && a_state.stage >= kStageCount - 1) {
@@ -750,13 +794,17 @@ namespace StarfrostWidgets::Widgets
 		const auto input = Input::GetSingleton();
 		const bool editing = input->EditMode();
 
-		if (!editing && (!settings.enabled || ShouldHideForUI(settings))) {
+		const auto& io = ImGui::GetIO();
+
+		if (editing) {
+			sFade = 1.0f;
+			sHoldRemaining = 0.0f;
+		} else if (UpdateFade(settings.enabled && !ShouldHideForUI(settings), io.DeltaTime) <= 0.001f) {
 			sPositionsDirty = true;  // re-seed window positions next time we edit
 			return;
 		}
 
-		const bool  survivalOn = data->SurvivalModeEnabled();
-		const auto& io = ImGui::GetIO();
+		const bool   survivalOn = data->SurvivalModeEnabled();
 		const ImVec2 display = io.DisplaySize;
 		auto*        background = ImGui::GetBackgroundDrawList();
 

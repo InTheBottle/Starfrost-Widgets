@@ -1,5 +1,7 @@
 #include "Menus.h"
 
+#include "Input.h"
+
 namespace StarfrostWidgets
 {
 	void Menus::Install()
@@ -16,9 +18,34 @@ namespace StarfrostWidgets
 
 	void Menus::Refresh()
 	{
-		if (const auto ui = RE::UI::GetSingleton()) {
-			hudOpen.store(ui->IsMenuOpen(RE::HUDMenu::MENU_NAME), std::memory_order_relaxed);
-			loadingOpen.store(ui->IsMenuOpen(RE::LoadingMenu::MENU_NAME), std::memory_order_relaxed);
+		const auto ui = RE::UI::GetSingleton();
+		if (!ui) {
+			return;
+		}
+
+		hudOpen.store(ui->IsMenuOpen(RE::HUDMenu::MENU_NAME), std::memory_order_relaxed);
+		loadingOpen.store(ui->IsMenuOpen(RE::LoadingMenu::MENU_NAME), std::memory_order_relaxed);
+
+		// Always open, so its own flag is the only word on whether a fade is running.
+		bool active = false;
+		if (const auto fader = ui->GetMenu<RE::FaderMenu>()) {
+			active = fader->GetRuntimeData().isActive;
+		}
+		fading.store(active, std::memory_order_relaxed);
+
+		EnforceEditModeGate();
+	}
+
+	void Menus::EnforceEditModeGate() const
+	{
+		const auto input = Input::GetSingleton();
+		if (!input->EditMode()) {
+			return;
+		}
+
+		if (!HUDOpen() || LoadingScreenOpen() || CoveringMenuOpen()) {
+			SKSE::log::info("Edit mode closed, the HUD is no longer arrangeable");
+			input->LeaveEditMode();
 		}
 	}
 
@@ -83,6 +110,8 @@ namespace StarfrostWidgets
 			counted.erase(found);
 			covering.fetch_sub(1, std::memory_order_relaxed);
 		}
+
+		EnforceEditModeGate();
 
 		return RE::BSEventNotifyControl::kContinue;
 	}

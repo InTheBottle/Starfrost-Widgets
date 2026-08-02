@@ -185,8 +185,6 @@ namespace StarfrostWidgets
 		hungerSpells[1] = Lookup<RE::SpellItem>("MAG_HungerSpell02", 0x000856, kStarfrostPlugin);
 		hungerSpells[2] = Lookup<RE::SpellItem>("MAG_HungerSpell03", 0x000857, kStarfrostPlugin);
 
-		// Gourmet hangs every cooked-food bonus off these three regen effects. The
-		// marriage meal grants all three at once through its own copies.
 		const auto food = [&](std::string_view a_editorID, std::uint32_t a_localID, BuffAttribute a_attribute) {
 			foodBuff.Add(Lookup<RE::EffectSetting>(a_editorID, a_localID, kGourmetPlugin), a_attribute);
 		};
@@ -197,8 +195,6 @@ namespace StarfrostWidgets
 		food("MAG_FoodFortifyMagickaRegenMarriage", 0x00080B, BuffAttribute::kMagicka);
 		food("MAG_FoodFortifyStaminaRegenMarriage", 0x00080C, BuffAttribute::kStamina);
 
-		// Gourmet's survival stews warm you through Survival Mode's own effect, and
-		// some of them grant nothing else - without this they would show no timer.
 		foodBuff.Add(Lookup<RE::EffectSetting>("Survival_FoodFortifyWarmth", 0x002EE6, "Update.esm"),
 			BuffAttribute::kWarmth);
 
@@ -211,16 +207,6 @@ namespace StarfrostWidgets
 		drink("MAG_AlcoholDamageStamina", 0x000803, BuffAttribute::kNone);
 		drink("MAG_AlcoholDamageMagicka", 0x000806, BuffAttribute::kNone);
 
-		// Pilgrim's 45 blessings each grant a different boon, but every one of those
-		// boons carries a shrine-blessing keyword and none of them are conditional.
-		//
-		// The obvious hook - the MAG_PilgrimXPEffect / MAG_CultistXPEffect markers the
-		// blessings also share - is the wrong one: those are gated behind Pilgrim's
-		// anti-farming XP cooldown, so praying at a mat re-casts the blessing without
-		// them and the widget would see nothing.
-		//
-		// Pilgrim injects both keywords into Update.esm's form space, hence the plugin
-		// name here; the editor ID is what actually resolves them in practice.
 		blessing.AddKeyword(Lookup<RE::BGSKeyword>("MAG_PilgrimShrineBlessing", 0x616101, "Update.esm"));
 		blessing.AddKeyword(Lookup<RE::BGSKeyword>("MAG_CultistShrineBlessing", 0x616102, "Update.esm"));
 

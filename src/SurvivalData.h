@@ -4,9 +4,6 @@
 
 namespace StarfrostWidgets
 {
-	// The render thread reads this while the main thread writes it, so everything here
-	// stays trivially copyable - a torn float or a clipped label is harmless, a torn
-	// std::string would not be.
 	struct GaugeState
 	{
 		bool          available{ false };
@@ -21,8 +18,6 @@ namespace StarfrostWidgets
 		char          label[64]{};      // the spell that granted it, for the edit panel
 	};
 
-	// Read-only view of everything the widgets draw: Survival Mode's need globals,
-	// Blade & Blunt's injury abilities, and the timed buffs from Gourmet and Pilgrim.
 	class SurvivalData : public REX::Singleton<SurvivalData>
 	{
 	public:
@@ -55,9 +50,6 @@ namespace StarfrostWidgets
 		// Food carries the most: three regen effects, their marriage-meal twins, and warmth.
 		static constexpr std::size_t kMaxTrackedEffects = 8;
 
-		// A buff is recognised either by one of its base effects, or by a keyword that
-		// its effects carry - which is the only workable route when a mod spreads one
-		// buff over dozens of per-flavour effects, as Pilgrim does across 45 deities.
 		struct BuffForms
 		{
 			TrackedEffect   effects[kMaxTrackedEffects]{};

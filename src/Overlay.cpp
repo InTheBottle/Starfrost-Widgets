@@ -1,6 +1,7 @@
 #include "Overlay.h"
 
 #include "Input.h"
+#include "Menus.h"
 #include "Settings.h"
 #include "SurvivalData.h"
 #include "Widgets.h"
@@ -26,8 +27,12 @@ namespace StarfrostWidgets::Overlay
 		bool              gImGuiReady{ false };
 		bool              gGaveUp{ false };
 
+		// The fade the widgets ride in on is far shorter than the need poll interval.
+		constexpr float kUIPollInterval = 1.0f / 30.0f;
+
 		std::chrono::steady_clock::time_point gLastFrame{};
 		float                                 gPollAccumulator{ 0.0f };
+		float                                 gUIAccumulator{ 0.0f };
 
 		// Compared by pointer, so the same object has to come back every time.
 		constexpr const char* kGameTargetName = "game";
@@ -227,17 +232,24 @@ namespace StarfrostWidgets::Overlay
 		// HasSpell walks the player's spell lists, so it cannot run on the render thread.
 		void PumpGameData(float a_deltaTime)
 		{
-			gPollAccumulator += a_deltaTime;
+			const auto tasks = SKSE::GetTaskInterface();
+			if (!tasks) {
+				return;
+			}
 
-			const auto interval = Settings::GetSingleton()->pollInterval;
-			if (gPollAccumulator < interval) {
+			gUIAccumulator += a_deltaTime;
+			if (gUIAccumulator >= kUIPollInterval) {
+				gUIAccumulator = 0.0f;
+				tasks->AddTask([]() { Menus::GetSingleton()->Refresh(); });
+			}
+
+			gPollAccumulator += a_deltaTime;
+			if (gPollAccumulator < Settings::GetSingleton()->pollInterval) {
 				return;
 			}
 			gPollAccumulator = 0.0f;
 
-			if (const auto tasks = SKSE::GetTaskInterface()) {
-				tasks->AddTask([]() { SurvivalData::GetSingleton()->Refresh(); });
-			}
+			tasks->AddTask([]() { SurvivalData::GetSingleton()->Refresh(); });
 		}
 
 		void RenderFrame(IDXGISwapChain* a_swapChain)

@@ -2,9 +2,6 @@
 
 namespace StarfrostWidgets
 {
-	// Cold ships disabled - Starfrost already gives it a vanilla HUD meter.
-	// kFoodBuff through kBlessing count a buff down instead of a need up; new entries
-	// go on the end so an existing ini keeps lining up with the gauge it was written for.
 	enum class Gauge : std::size_t
 	{
 		kHunger = 0,
