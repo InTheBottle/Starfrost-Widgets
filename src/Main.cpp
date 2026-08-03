@@ -4,6 +4,8 @@
 #include "Settings.h"
 #include "SurvivalData.h"
 
+#include <Version.h>
+
 using namespace StarfrostWidgets;
 
 namespace
@@ -37,8 +39,8 @@ namespace
 }
 
 SKSEPluginInfo(
-	.Version = { 1, 3, 0, 0 },
-	.Name = "StarfrostWidgets",
+	.Version = { Version::MAJOR, Version::MINOR, Version::PATCH, 0 },
+	.Name = Version::PROJECT,
 	.Author = "bottle")
 
 SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
@@ -53,6 +55,6 @@ SKSEPluginLoad(const SKSE::LoadInterface* a_skse)
 		return false;
 	}
 
-	SKSE::log::info("StarfrostWidgets loaded");
+	SKSE::log::info("{} v{} loaded", Version::PROJECT, Version::NAME);
 	return true;
 }

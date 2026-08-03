@@ -33,7 +33,25 @@ namespace StarfrostWidgets
 		}
 		fading.store(active, std::memory_order_relaxed);
 
+		DropClosedMenus(ui);
+
 		EnforceEditModeGate();
+	}
+
+	void Menus::DropClosedMenus(RE::UI* a_ui)
+	{
+		const std::scoped_lock lock{ countedLock };
+
+		for (auto entry = counted.begin(); entry != counted.end();) {
+			if (a_ui->GetMenu(*entry)) {
+				++entry;
+				continue;
+			}
+
+			SKSE::log::info("Menu {} went away without a close event, releasing its hold on the widgets", *entry);
+			entry = counted.erase(entry);
+			covering.fetch_sub(1, std::memory_order_relaxed);
+		}
 	}
 
 	void Menus::EnforceEditModeGate() const
@@ -102,13 +120,17 @@ namespace StarfrostWidgets
 			loadingOpen.store(a_event->opening, std::memory_order_relaxed);
 		}
 
-		if (a_event->opening) {
-			if (CoversScreen(a_event->menuName) && counted.emplace(a_event->menuName.c_str()).second) {
-				covering.fetch_add(1, std::memory_order_relaxed);
+		{
+			const std::scoped_lock lock{ countedLock };
+
+			if (a_event->opening) {
+				if (CoversScreen(a_event->menuName) && counted.emplace(a_event->menuName.c_str()).second) {
+					covering.fetch_add(1, std::memory_order_relaxed);
+				}
+			} else if (const auto found = counted.find(a_event->menuName.c_str()); found != counted.end()) {
+				counted.erase(found);
+				covering.fetch_sub(1, std::memory_order_relaxed);
 			}
-		} else if (const auto found = counted.find(a_event->menuName.c_str()); found != counted.end()) {
-			counted.erase(found);
-			covering.fetch_sub(1, std::memory_order_relaxed);
 		}
 
 		EnforceEditModeGate();

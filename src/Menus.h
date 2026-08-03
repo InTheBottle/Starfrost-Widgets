@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <mutex>
 #include <set>
 #include <string>
 
@@ -34,10 +35,13 @@ namespace StarfrostWidgets
 
 		void EnforceEditModeGate() const;
 
+		void DropClosedMenus(RE::UI* a_ui);
+
 		std::atomic<std::uint32_t>        covering{ 0 };
 		std::atomic<bool>                 hudOpen{ false };
 		std::atomic<bool>                 loadingOpen{ false };
 		std::atomic<bool>                 fading{ false };
+		std::mutex                        countedLock{};
 		std::set<std::string, std::less<>> counted{};
 	};
 }

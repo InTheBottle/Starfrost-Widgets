@@ -2,13 +2,25 @@ cmake_minimum_required(VERSION 3.21)
 
 project(
 	StarfrostWidgets
-	LANGUAGES CXX
+	LANGUAGES CXX RC
 	VERSION 1.3.0
 	DESCRIPTION "Real-time HUD widgets for Starfrost survival needs, Blade & Blunt injuries, Stress and Fear stress, and Gourmet/Pilgrim buff timers"
 )
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+configure_file(
+	${CMAKE_CURRENT_SOURCE_DIR}/cmake/Version.h.in
+	${CMAKE_CURRENT_BINARY_DIR}/include/Version.h
+	@ONLY
+)
+
+configure_file(
+	${CMAKE_CURRENT_SOURCE_DIR}/cmake/version.rc.in
+	${CMAKE_CURRENT_BINARY_DIR}/version.rc
+	@ONLY
+)
 
 # Use static CRT globally to match vcpkg x64-windows-static triplet
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
@@ -46,7 +58,11 @@ source_group(
 )
 
 # ---- Build DLL ----
-add_library(${PROJECT_NAME} SHARED ${SOURCES})
+add_library(${PROJECT_NAME} SHARED
+	${SOURCES}
+	${CMAKE_CURRENT_BINARY_DIR}/include/Version.h
+	${CMAKE_CURRENT_BINARY_DIR}/version.rc
+)
 
 target_compile_features(${PROJECT_NAME}
 	PRIVATE
@@ -56,6 +72,7 @@ target_compile_features(${PROJECT_NAME}
 target_include_directories(${PROJECT_NAME}
 	PRIVATE
 		${CMAKE_CURRENT_SOURCE_DIR}/src
+		${CMAKE_CURRENT_BINARY_DIR}/include
 )
 
 target_compile_definitions(${PROJECT_NAME}
@@ -83,6 +100,13 @@ target_precompile_headers(${PROJECT_NAME}
 if(MSVC)
 	target_compile_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Release>:/Zi>)
 	target_link_options(${PROJECT_NAME} PRIVATE $<$<CONFIG:Release>:/DEBUG /OPT:REF /OPT:ICF>)
+
+	target_compile_options(${PROJECT_NAME}
+		PRIVATE
+			/external:anglebrackets
+			/external:W0
+			/utf-8
+	)
 endif()
 
 # ---- Output ----
