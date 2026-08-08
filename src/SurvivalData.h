@@ -78,7 +78,7 @@ namespace StarfrostWidgets
 		void RefreshStress();
 
 		// Three abilities standing in for a 0-3 severity ladder.
-		void RefreshTiers(Gauge a_gauge, RE::SpellItem* const (&a_spells)[3]);
+		void RefreshTiers(Gauge a_gauge, const char* a_name, RE::SpellItem* const (&a_spells)[3]);
 
 		[[nodiscard]] bool UseHungerTiers() const;
 

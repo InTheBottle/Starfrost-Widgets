@@ -98,6 +98,21 @@ namespace StarfrostWidgets
 			a_dest[i] = '\0';
 		}
 
+		[[nodiscard]] bool SpellInForce(RE::BSSimpleList<RE::ActiveEffect*>* a_effects, const RE::MagicItem* a_spell)
+		{
+			for (const auto effect : *a_effects) {
+				if (!effect || effect->spell != a_spell) {
+					continue;
+				}
+				if (!effect->flags.any(RE::ActiveEffect::Flag::kInactive, RE::ActiveEffect::Flag::kDispelled) &&
+					effect->conditionStatus != RE::ActiveEffect::ConditionStatus::kFalse) {
+					return true;
+				}
+			}
+
+			return false;
+		}
+
 		// What a single gauge picked up from one pass over the active effect list.
 		struct BuffAccumulator
 		{
@@ -246,7 +261,7 @@ namespace StarfrostWidgets
 		RefreshHunger();
 		RefreshNeed(Gauge::kSleep, sleep);
 		RefreshNeed(Gauge::kCold, cold);
-		RefreshTiers(Gauge::kInjury, injurySpells);
+		RefreshTiers(Gauge::kInjury, "Injury", injurySpells);
 		RefreshBuffs();
 		RefreshStress();
 	}
@@ -254,7 +269,7 @@ namespace StarfrostWidgets
 	void SurvivalData::RefreshHunger()
 	{
 		if (UseHungerTiers()) {
-			RefreshTiers(Gauge::kHunger, hungerSpells);
+			RefreshTiers(Gauge::kHunger, "Hunger", hungerSpells);
 		} else {
 			RefreshNeed(Gauge::kHunger, hunger);
 		}
@@ -288,9 +303,11 @@ namespace StarfrostWidgets
 		                  StageFromThresholds(state.value, a_forms.stages);
 	}
 
-	void SurvivalData::RefreshTiers(Gauge a_gauge, RE::SpellItem* const (&a_spells)[3])
+	void SurvivalData::RefreshTiers(Gauge a_gauge, const char* a_name, RE::SpellItem* const (&a_spells)[3])
 	{
 		auto& state = states[static_cast<std::size_t>(a_gauge)];
+
+		const auto previous = static_cast<std::size_t>(state.value);
 		state = {};
 
 		const auto player = RE::PlayerCharacter::GetSingleton();
@@ -298,10 +315,16 @@ namespace StarfrostWidgets
 			return;
 		}
 
+		const auto target = player->AsMagicTarget();
+		const auto effects = target ? target->GetActiveEffectList() : nullptr;
+
 		// Highest tier wins, whether or not the lower abilities stay attached.
 		std::size_t tier = 0;
 		for (std::size_t i = 3; i-- > 0;) {
-			if (a_spells[i] && player->HasSpell(a_spells[i])) {
+			if (!a_spells[i]) {
+				continue;
+			}
+			if (effects ? SpellInForce(effects, a_spells[i]) : player->HasSpell(a_spells[i])) {
 				tier = i + 1;
 				break;
 			}
@@ -318,6 +341,18 @@ namespace StarfrostWidgets
 		state.fill = static_cast<float>(tier) / 3.0f;
 		state.stage = kTierToStage[tier];
 		CopyLabel(state.label, tier ? a_spells[tier - 1]->GetFullName() : nullptr);
+
+		if (tier != previous) {
+			std::size_t attached = 0;
+			for (std::size_t i = 3; i-- > 0;) {
+				if (a_spells[i] && player->HasSpell(a_spells[i])) {
+					attached = i + 1;
+					break;
+				}
+			}
+			SKSE::log::info("{} tier {} -> {} (highest ability still attached: {})",
+				a_name, previous, tier, attached);
+		}
 	}
 
 	void SurvivalData::RefreshBuffs()
