@@ -32,19 +32,24 @@ if (-not $NoBuild) {
     if (-not $env:VCPKG_ROOT) { throw 'VCPKG_ROOT is not set.' }
     Invoke-Native 'cmake configure' { cmake --preset release }
     Invoke-Native 'cmake build' { cmake --build --preset release }
+    Invoke-Native 'skin build' { python -m tools.swfgen.build }
+    Invoke-Native 'skin validate' { python -m tools.swfgen.validate }
 }
 
 $built = Join-Path $repo 'build\release\Release'
 $stage = Join-Path $repo "dist\StarfrostWidgets-$Version"
 $plugins = Join-Path $stage 'SKSE\Plugins'
+$interface = Join-Path $stage 'Interface'
 
 # Start empty so a renamed or dropped file cannot linger in the archive.
 if (Test-Path $stage) { Remove-Item $stage -Recurse -Force }
 New-Item -ItemType Directory -Force -Path $plugins | Out-Null
+New-Item -ItemType Directory -Force -Path $interface | Out-Null
 
 Copy-Item (Join-Path $built 'StarfrostWidgets.dll') $plugins
 Copy-Item (Join-Path $built 'StarfrostWidgets.pdb') $plugins
 Copy-Item (Join-Path $repo 'SKSE\Plugins\StarfrostWidgets.ini') $plugins
+Copy-Item (Join-Path $repo 'Interface\StarfrostWidgets.swf') $interface
 Copy-Item (Join-Path $repo 'README.txt') $stage
 
 $zip = Join-Path $repo "dist\StarfrostWidgets-$Version.zip"

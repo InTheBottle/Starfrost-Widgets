@@ -1,19 +1,37 @@
-Starfrost Widgets 1.3.0
+Starfrost Widgets 1.4.0
 by bottle
 
 Live HUD widgets for Starfrost's survival needs, Blade & Blunt's injuries,
-Stress and Fear's stress, and the timed buffs from Gourmet and Pilgrim.
+Stress and Fear's stress, and the timed buffs from Gourmet, Pilgrim and
+Adamant's bard songs.
 
 Four need gauges - Hunger, Sleep, Injury and Stress - sit on the HUD and
 colour-grade from green to red as things get worse. A fifth, Cold, is included
 but switched off.
 
-Three buff timers - Food, Alcohol and Blessing - run the same ramp backwards:
+Four buff timers - Food, Alcohol, Blessing and Lute - run the same ramp
+backwards:
 the ring starts full and green when the buff lands and empties towards red as it
 runs out, with the time left printed underneath. The food and alcohol widgets
 also badge what is currently fortified.
 
 Everything can be dragged into place and recoloured in game.
+
+RESKINNING
+  The widgets can be drawn by Data/Interface/StarfrostWidgets.swf instead of the
+  plugin's own drawing, so a mod can replace the art the way any other Skyrim UI
+  replacer does: ship that file, sit later in the load order, win the overwrite.
+
+  The movie carries no ActionScript. The plugin drives every clip in it from
+  code, so a reskin is a drawing job in JPEXS Free Flash Decompiler rather than a
+  programming job, and there is no script for a skin to get wrong.
+
+  A skin also draws in the game's own UI layer, so it is composited by the game
+  and survives frame generation.
+
+  iRenderer in the ini picks the renderer: 0 uses a skin when one loads and falls
+  back to the built-in drawing otherwise, 1 forces the built-in drawing, 2 is
+  skin only. Skinners should read docs/Skinning.md in the source repository.
 
 REQUIREMENTS
   - Skyrim Special Edition / Anniversary Edition
@@ -25,6 +43,7 @@ REQUIREMENTS
   - Stress and Fear - A Dynamic Sanity System (only for the Stress widget)
   - Gourmet - A Cooking Overhaul (only for the Food and Alcohol widgets)
   - Pilgrim - A Religion Overhaul (only for the Blessing widget)
+  - Adamant - A Perk Overhaul (only for the Lute widget)
 
   Skyrim VR is not supported.
 
@@ -109,6 +128,7 @@ SETTINGS
                           0 = auto, 1 = swap chain, 2 = game framebuffer.
 
   [Hunger] [Sleep] [Injury] [Cold] [FoodBuff] [Alcohol] [Blessing] [Stress]
+  [Lute]
     bEnabled              Show this widget.
     fPosX, fPosY          Position as a fraction of screen size, 0.0 - 1.0,
                           measured to the widget's top-left corner.
@@ -169,6 +189,15 @@ WHAT THE BUFF TIMERS WATCH
             there is no per-deity list that can fall out of date. The edit panel
             names the blessing that is running.
 
+  Lute      Adamant's bard songs. Playing an instrument puts a ten-minute song
+            buff on you, and every one of those carries a bard-song keyword, so
+            one widget covers the lute, the drum and the flute alike - the icon
+            is a lute, but the edit panel and the caption name whichever song
+            is actually playing. The fortify effects the song grants are not
+            what is matched: those are perk-gated and Adamant puts the same
+            keyword on the versions NPC bards cast at you, so matching them
+            would light the widget for someone else's playing.
+
   Where more than one effect is running on a widget, the timer follows the one
   with the longest left, so it reads as "this buff is gone in X".
 
@@ -176,7 +205,7 @@ WHAT THE BUFF TIMERS WATCH
   the food timer and Special Ingredients extends alcohol; the widget reads the
   effect's real duration, so a tripled buff simply shows a longer ring.
 
-  With Dynamic off, these three keep their place on the HUD while no buff is
+  With Dynamic off, these four keep their place on the HUD while no buff is
   running, drawn as a dim grey icon on an empty ring with no timer under it,
   rather than disappearing and shoving the layout about every time a buff lands
   or expires. A widget whose source mod is not installed still draws nothing at

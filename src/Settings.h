@@ -12,6 +12,7 @@ namespace StarfrostWidgets
 		kAlcohol,
 		kBlessing,
 		kStress,
+		kLute,
 
 		kTotal
 	};
@@ -27,7 +28,8 @@ namespace StarfrostWidgets
 	// Buff timers read the stage ramp backwards: full is calm, nearly expired is critical.
 	[[nodiscard]] inline constexpr bool IsTimerGauge(Gauge a_gauge)
 	{
-		return a_gauge == Gauge::kFoodBuff || a_gauge == Gauge::kAlcohol || a_gauge == Gauge::kBlessing;
+		return a_gauge == Gauge::kFoodBuff || a_gauge == Gauge::kAlcohol || a_gauge == Gauge::kBlessing ||
+		       a_gauge == Gauge::kLute;
 	}
 
 	// Which attribute a buff is working on, so the widget can badge it.
@@ -71,6 +73,14 @@ namespace StarfrostWidgets
 		kGameFrameBuffer = 2
 	};
 
+	// Which of the two renderers draws the widgets. Only ever one at a time.
+	enum class Renderer : std::int32_t
+	{
+		kAuto = 0,      // the skin movie if it loads, the built-in drawing otherwise
+		kBuiltIn = 1,   // never load a movie
+		kSkin = 2       // movie only, so a broken skin shows up as nothing rather than a fallback
+	};
+
 	struct WidgetSettings
 	{
 		bool         enabled{ true };
@@ -105,6 +115,7 @@ namespace StarfrostWidgets
 		bool          pulseAtCritical{ true };
 		float         pollInterval{ 0.25f };
 		RenderTarget  renderTarget{ RenderTarget::kAuto };
+		Renderer      renderer{ Renderer::kAuto };
 
 		WidgetSettings widgets[kGaugeCount]{};
 

@@ -5,8 +5,9 @@ An SKSE plugin that puts live HUD widgets on screen for
 needs, [Blade & Blunt](https://www.nexusmods.com/skyrimspecialedition/mods/49015)'s
 injuries, [Stress and Fear](https://www.nexusmods.com/skyrimspecialedition/mods/116522)'s
 stress, and the timed buffs from
-[Gourmet](https://www.nexusmods.com/skyrimspecialedition/mods/60063) and
-[Pilgrim](https://www.nexusmods.com/skyrimspecialedition/mods/45557).
+[Gourmet](https://www.nexusmods.com/skyrimspecialedition/mods/60063),
+[Pilgrim](https://www.nexusmods.com/skyrimspecialedition/mods/45557) and
+[Adamant](https://www.nexusmods.com/skyrimspecialedition/mods/30191)'s bard songs.
 
 ### Needs
 
@@ -63,6 +64,7 @@ The log records which one it settled on.
 | Food | steaming bowl of soup | Gourmet's `MAG_FoodFortify{Health,Magicka,Stamina}Regen{Basic,Marriage}`, plus `Survival_FoodFortifyWarmth` |
 | Alcohol | mead bottle | Gourmet's `MAG_AlcoholFortify{Magicka,Stamina}` and their paired drains |
 | Blessing | Shrine of Mara medallion | anything carrying Pilgrim's `MAG_PilgrimShrineBlessing` / `MAG_CultistShrineBlessing` keyword |
+| Lute | lute | anything carrying Adamant's `MAG_BardSongKeyword` |
 
 These read the same ramp backwards: the ring starts full and green when the buff
 lands and empties towards red as it runs out, so the pulse at the last stage is a
@@ -94,8 +96,39 @@ Pilgrim's anti-farming XP cooldown, so praying re-casts the blessing without the
 and a widget keyed on them would show nothing. The boons themselves carry no
 conditions at all.
 
+The lute widget works the same way, on Adamant's bard songs. Playing an
+instrument casts one of `MAG_{Lute,Drum,Flute}BuffSpell` on you, and the effects
+that carry the ten-minute timer — `MAG_{Lute,Drum,Flute}BuffEffect01/02` — are
+the ones marked with `MAG_BardSongKeyword`. One keyword covers all three
+instruments, so the widget is a lute for the icon's sake but lights up for a drum
+or a flute just the same; the edit panel and the caption name whichever song is
+actually running.
+
+The instrument's fortify effects are deliberately not what is matched. Those are
+gated behind Adamant's bard perks and carry `MAG_BardPerkKeyword` instead, which
+Adamant also puts on the versions NPC bards cast at you — matching it would light
+your widget for someone else's playing. The song effects grant no attributes of
+their own, so this widget carries no badge row.
+
 Every widget can be drawn as a ring gauge, a bare icon, or a bar, and everything
 is moveable and recolourable in game.
+
+## Reskinning
+
+The widgets can be drawn by `Data/Interface/StarfrostWidgets.swf` rather than the
+plugin's own vector drawing, so a mod can replace the art the same way any other
+Skyrim UI replacer does — ship that file, sit later in the load order, win the
+overwrite. The movie carries no ActionScript at all: the plugin drives every
+clip through `GFxValue`, so a reskin is a drawing job in JPEXS rather than a
+programming job.
+
+A skin also draws in the game's own UI pass, which means it is composited by the
+game and survives frame generation without the `iRenderTarget` guesswork.
+
+`iRenderer` picks the renderer: `0` uses the skin when one loads and falls back
+to the built-in drawing otherwise, `1` forces the built-in drawing, `2` is skin
+only. The shipped skin is generated from `tools/swfgen/`, so the artwork has a
+readable source. See [docs/Skinning.md](docs/Skinning.md).
 
 ## Moving things around
 

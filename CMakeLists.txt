@@ -3,8 +3,8 @@ cmake_minimum_required(VERSION 3.21)
 project(
 	StarfrostWidgets
 	LANGUAGES CXX RC
-	VERSION 1.3.0
-	DESCRIPTION "Real-time HUD widgets for Starfrost survival needs, Blade & Blunt injuries, Stress and Fear stress, and Gourmet/Pilgrim buff timers"
+	VERSION 1.4.0
+	DESCRIPTION "Real-time HUD widgets for Starfrost survival needs, Blade & Blunt injuries, Stress and Fear stress, and Gourmet/Pilgrim/Adamant buff timers"
 )
 
 set(CMAKE_CXX_STANDARD 23)
@@ -42,6 +42,11 @@ set(SOURCES
 	src/Settings.cpp
 	src/SurvivalData.h
 	src/SurvivalData.cpp
+	src/Layout.h
+	src/Layout.cpp
+	src/GeneratedSkin.h
+	src/Skin.h
+	src/Skin.cpp
 	src/Menus.h
 	src/Menus.cpp
 	src/Overlay.h
@@ -112,6 +117,7 @@ endif()
 # ---- Output ----
 if(DEFINED ENV{SKYRIM_MODS_FOLDER})
 	set(OUTPUT_FOLDER "$ENV{SKYRIM_MODS_FOLDER}/StarfrostWidgets/SKSE/Plugins")
+	set(INTERFACE_FOLDER "$ENV{SKYRIM_MODS_FOLDER}/StarfrostWidgets/Interface")
 endif()
 
 if(DEFINED OUTPUT_FOLDER)
@@ -137,6 +143,16 @@ if(DEFINED OUTPUT_FOLDER)
 		POST_BUILD
 		COMMAND "${CMAKE_COMMAND}" -E copy_if_different
 			"${CMAKE_CURRENT_SOURCE_DIR}/SKSE/Plugins/StarfrostWidgets.ini" "${OUTPUT_FOLDER}"
+		VERBATIM
+	)
+
+	# The default skin. A reskin mod overwrites this file from a later mod folder.
+	add_custom_command(
+		TARGET ${PROJECT_NAME}
+		POST_BUILD
+		COMMAND "${CMAKE_COMMAND}" -E make_directory "${INTERFACE_FOLDER}"
+		COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+			"${CMAKE_CURRENT_SOURCE_DIR}/Interface/StarfrostWidgets.swf" "${INTERFACE_FOLDER}"
 		VERBATIM
 	)
 endif()

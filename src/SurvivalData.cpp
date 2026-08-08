@@ -11,6 +11,7 @@ namespace StarfrostWidgets
 		constexpr const char* kPilgrimPlugin = "Pilgrim.esp";
 		constexpr const char* kStarfrostPlugin = "Starfrost.esp";
 		constexpr const char* kStressPlugin = "Stress and Fear.esp";
+		constexpr const char* kAdamantPlugin = "Adamant.esp";
 
 		constexpr float kStressThresholds[5] = { 0.0f, 25.0f, 45.0f, 65.0f, 85.0f };
 		constexpr float kStressMax = 100.0f;
@@ -225,9 +226,11 @@ namespace StarfrostWidgets
 		blessing.AddKeyword(Lookup<RE::BGSKeyword>("MAG_PilgrimShrineBlessing", 0x616101, "Update.esm"));
 		blessing.AddKeyword(Lookup<RE::BGSKeyword>("MAG_CultistShrineBlessing", 0x616102, "Update.esm"));
 
+		bardSong.AddKeyword(Lookup<RE::BGSKeyword>("MAG_BardSongKeyword", 0x4B5904, kAdamantPlugin));
+
 		resolved = true;
 
-		SKSE::log::info("Form resolution: hunger={} sleep={} cold={} injuries={} food={} alcohol={} blessing={} stress={}",
+		SKSE::log::info("Form resolution: hunger={} sleep={} cold={} injuries={} food={} alcohol={} blessing={} bardsong={} stress={}",
 			hunger.value != nullptr,
 			sleep.value != nullptr,
 			cold.value != nullptr,
@@ -235,6 +238,7 @@ namespace StarfrostWidgets
 			foodBuff.count,
 			alcohol.count,
 			blessing.keywordCount,
+			bardSong.keywordCount,
 			stress.value != nullptr);
 
 		SKSE::log::info("Hunger source: {}",
@@ -357,10 +361,11 @@ namespace StarfrostWidgets
 
 	void SurvivalData::RefreshBuffs()
 	{
-		constexpr Gauge kGauges[3] = { Gauge::kFoodBuff, Gauge::kAlcohol, Gauge::kBlessing };
-		const BuffForms* const kForms[3] = { &foodBuff, &alcohol, &blessing };
+		constexpr Gauge kGauges[] = { Gauge::kFoodBuff, Gauge::kAlcohol, Gauge::kBlessing, Gauge::kLute };
+		constexpr std::size_t kCount = std::size(kGauges);
+		const BuffForms* const kForms[kCount] = { &foodBuff, &alcohol, &blessing, &bardSong };
 
-		for (std::size_t i = 0; i < 3; ++i) {
+		for (std::size_t i = 0; i < kCount; ++i) {
 			auto& state = states[static_cast<std::size_t>(kGauges[i])];
 			state = {};
 			state.available = kForms[i]->Resolved();
@@ -374,9 +379,9 @@ namespace StarfrostWidgets
 			return;
 		}
 
-		BuffAccumulator accumulators[3]{};
+		BuffAccumulator accumulators[kCount]{};
 
-		// One pass over the list, matched against all three gauges as we go.
+		// One pass over the list, matched against every gauge as we go.
 		for (const auto effect : *active) {
 			if (!effect || effect->flags.any(RE::ActiveEffect::Flag::kInactive, RE::ActiveEffect::Flag::kDispelled)) {
 				continue;
@@ -392,7 +397,7 @@ namespace StarfrostWidgets
 				continue;
 			}
 
-			for (std::size_t i = 0; i < 3; ++i) {
+			for (std::size_t i = 0; i < kCount; ++i) {
 				const auto attribute = kForms[i]->Match(base);
 				if (!attribute) {
 					continue;
@@ -410,7 +415,7 @@ namespace StarfrostWidgets
 			}
 		}
 
-		for (std::size_t i = 0; i < 3; ++i) {
+		for (std::size_t i = 0; i < kCount; ++i) {
 			const auto& accumulator = accumulators[i];
 			if (accumulator.remaining < 0.0f) {
 				continue;

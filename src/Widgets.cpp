@@ -1,8 +1,10 @@
 #include "Widgets.h"
 
 #include "Input.h"
+#include "Layout.h"
 #include "Menus.h"
 #include "Settings.h"
+#include "Skin.h"
 #include "SurvivalData.h"
 
 namespace StarfrostWidgets::Widgets
@@ -10,7 +12,7 @@ namespace StarfrostWidgets::Widgets
 	namespace
 	{
 		constexpr const char* kNames[kGaugeCount] = {
-			"Hunger", "Sleep", "Injury", "Cold", "Food", "Alcohol", "Blessing", "Stress"
+			"Hunger", "Sleep", "Injury", "Cold", "Food", "Alcohol", "Blessing", "Stress", "Lute"
 		};
 		static_assert(kNames[kGaugeCount - 1] != nullptr, "A new Gauge needs a display name");
 
@@ -22,10 +24,10 @@ namespace StarfrostWidgets::Widgets
 			IM_COL32(232, 146, 62, 255)
 		};
 
-		// Footprints at scale 1.0, sized against a 1080p HUD.
-		constexpr float kRingBox = 76.0f;
-		constexpr float kIconBox = 56.0f;
-		constexpr ImVec2 kBarBox{ 190.0f, 46.0f };
+		using Layout::kIconBox;
+		using Layout::kIdleAlpha;
+		using Layout::kIdleColor;
+		using Layout::kRingBox;
 
 		// IM_PI lives in imgui_internal.h, which is not worth pulling in.
 		constexpr float kPi = 3.14159265358979323846f;
@@ -34,26 +36,8 @@ namespace StarfrostWidgets::Widgets
 		constexpr ImU32 kBackingColor = IM_COL32(8, 8, 10, 120);
 		constexpr ImU32 kShadowColor = IM_COL32(0, 0, 0, 190);
 
-		constexpr ImU32 kIdleColor = IM_COL32(146, 143, 136, 255);
-		constexpr float kIdleAlpha = 0.45f;
-
-		constexpr float kFadeInSeconds = 0.60f;
-		constexpr float kFadeOutSeconds = 0.20f;
-
-		// The screen fade has to have been over for this long before the widgets start rising.
-		constexpr float kFadeSettleSeconds = 0.40f;
-
-		// A ceiling on the hold, so a fade flag we misread can never keep the widgets off.
-		constexpr float kFadeHoldSeconds = 5.0f;
-
 		// Set for one frame after the panel moves a widget; otherwise the window owns its position.
 		bool sPositionsDirty = true;
-
-		float sFade = 0.0f;
-		float sHoldRemaining = 0.0f;
-		float sSettleRemaining = 0.0f;
-		bool  sWasLoading = false;
-		bool  sWasHUDOpen = false;
 
 		[[nodiscard]] ImVec2 operator+(const ImVec2& a_lhs, const ImVec2& a_rhs)
 		{
@@ -80,31 +64,7 @@ namespace StarfrostWidgets::Widgets
 			return static_cast<float>((a_color >> IM_COL32_A_SHIFT) & 0xFF) / 255.0f;
 		}
 
-		// Buff timers count down, so "8h 02m" beats a bare number of seconds.
-		[[nodiscard]] std::string FormatDuration(float a_seconds)
-		{
-			const auto total = static_cast<int>(std::max(a_seconds, 0.0f) + 0.5f);
-			if (total >= 3600) {
-				return std::format("{}h {:02}m", total / 3600, (total % 3600) / 60);
-			}
-			if (total >= 60) {
-				return std::format("{}:{:02}", total / 60, total % 60);
-			}
-			return std::format("{}s", total);
-		}
-
-		[[nodiscard]] ImVec2 BoxSize(const WidgetSettings& a_widget, float a_scale)
-		{
-			switch (a_widget.style) {
-			case WidgetStyle::kIcon:
-				return { kIconBox * a_scale, kIconBox * a_scale };
-			case WidgetStyle::kBar:
-				return { kBarBox.x * a_scale, kBarBox.y * a_scale };
-			case WidgetStyle::kRing:
-			default:
-				return { kRingBox * a_scale, kRingBox * a_scale };
-			}
-		}
+		using Layout::FormatDuration;
 
 		void AddCenteredText(ImDrawList* a_list, ImVec2 a_center, float a_size, ImU32 a_color, const char* a_text)
 		{
@@ -294,6 +254,32 @@ namespace StarfrostWidgets::Widgets
 			a_list->AddCircleFilled(a_center, a_radius * 0.19f, a_color, 20);
 		}
 
+		void DrawLuteIcon(ImDrawList* a_list, ImVec2 a_center, float a_radius, ImU32 a_color)
+		{
+			const ImU32 seam = WithAlpha(IM_COL32(16, 13, 11, 255), AlphaOf(a_color) * 0.9f);
+
+			const ImVec2 bowl{ a_center.x - a_radius * 0.26f, a_center.y + a_radius * 0.34f };
+			const ImVec2 heel{ bowl.x + a_radius * 0.24f, bowl.y - a_radius * 0.34f };
+			const ImVec2 head{ a_center.x + a_radius * 0.66f, a_center.y - a_radius * 0.82f };
+
+			a_list->AddLine(heel, head, a_color, a_radius * 0.15f);
+			a_list->AddCircleFilled(bowl, a_radius * 0.50f, a_color, 24);
+			a_list->AddCircleFilled(heel, a_radius * 0.33f, a_color, 20);
+
+			const ImVec2 peg{ head.x - a_radius * 0.02f, head.y - a_radius * 0.20f };
+			a_list->AddLine(head, peg, a_color, a_radius * 0.26f);
+
+			a_list->AddCircleFilled({ bowl.x + a_radius * 0.06f, bowl.y - a_radius * 0.10f },
+				a_radius * 0.155f, seam, 16);
+
+			const float string = std::max(1.0f, a_radius * 0.05f);
+			for (const float side : { -1.0f, 1.0f }) {
+				const ImVec2 offset{ side * a_radius * 0.055f, side * a_radius * 0.045f };
+				a_list->AddLine({ bowl.x + offset.x, bowl.y + offset.y }, { head.x + offset.x, head.y + offset.y },
+					seam, string);
+			}
+		}
+
 		void DrawStressIcon(ImDrawList* a_list, ImVec2 a_center, float a_radius, ImU32 a_color)
 		{
 			const ImU32 hollow = WithAlpha(IM_COL32(14, 11, 12, 255), AlphaOf(a_color) * 0.92f);
@@ -398,13 +384,7 @@ namespace StarfrostWidgets::Widgets
 			}
 		}
 
-		[[nodiscard]] std::size_t IconTier(const GaugeState& a_state)
-		{
-			if (a_state.tiered) {
-				return static_cast<std::size_t>(std::clamp(a_state.value, 0.0f, 3.0f));
-			}
-			return std::min(a_state.stage, kStageCount - 1) / 2;
-		}
+		using Layout::IconTier;
 
 		void DrawIcon(ImDrawList* a_list, Gauge a_gauge, ImVec2 a_center, float a_radius, ImU32 a_color, std::size_t a_tier)
 		{
@@ -426,6 +406,9 @@ namespace StarfrostWidgets::Widgets
 				break;
 			case Gauge::kBlessing:
 				DrawBlessingIcon(a_list, a_center, a_radius, a_color);
+				break;
+			case Gauge::kLute:
+				DrawLuteIcon(a_list, a_center, a_radius, a_color);
 				break;
 			case Gauge::kStress:
 				DrawStressIcon(a_list, a_center, a_radius, a_color);
@@ -489,76 +472,12 @@ namespace StarfrostWidgets::Widgets
 			}
 		}
 
-		[[nodiscard]] bool ShouldHideForUI(const Settings& a_settings)
-		{
-			const auto ui = RE::UI::GetSingleton();
-			if (!ui) {
-				return true;
-			}
-
-			const auto menus = Menus::GetSingleton();
-
-			// Not a covering menu: the loading screen keeps kAlwaysOpen throughout.
-			if (menus->LoadingScreenOpen()) {
-				return true;
-			}
-			// No HUD means the main menu.
-			if (!menus->HUDOpen()) {
-				return true;
-			}
-			if (a_settings.hideWhenHUDHidden && !ui->IsShowingMenus()) {
-				return true;
-			}
-			if (a_settings.hideInMenus && menus->CoveringMenuOpen()) {
-				return true;
-			}
-
-			return false;
-		}
-
-		// Loading screens and the HUD coming up both start a fresh entrance.
-		float UpdateFade(bool a_visible, float a_deltaTime)
-		{
-			const auto menus = Menus::GetSingleton();
-			const bool loading = menus->LoadingScreenOpen();
-			const bool hudOpen = menus->HUDOpen();
-
-			if ((sWasLoading && !loading) || (!sWasHUDOpen && hudOpen)) {
-				sHoldRemaining = kFadeHoldSeconds;
-				sSettleRemaining = kFadeSettleSeconds;
-			}
-			sWasLoading = loading;
-			sWasHUDOpen = hudOpen;
-
-			if (sHoldRemaining > 0.0f) {
-				sHoldRemaining -= a_deltaTime;
-				sSettleRemaining = menus->ScreenFading() ?
-				                       kFadeSettleSeconds :
-				                       sSettleRemaining - a_deltaTime;
-				if (sSettleRemaining <= 0.0f) {
-					sHoldRemaining = 0.0f;
-				}
-			}
-
-			const bool  rising = a_visible && sHoldRemaining <= 0.0f;
-			const float step = rising ? a_deltaTime / kFadeInSeconds : -a_deltaTime / kFadeOutSeconds;
-
-			sFade = std::clamp(sFade + step, 0.0f, 1.0f);
-			return sFade;
-		}
-
 		void DrawGaugeBody(ImDrawList* a_list, ImVec2 a_origin, ImVec2 a_size, Gauge a_gauge,
 			const WidgetSettings& a_widget, const GaugeState& a_state, const Settings& a_settings, float a_scale)
 		{
 			const bool  idle = a_state.timer && !a_state.active;
-			const ImU32 color = idle ? kIdleColor : a_widget.stageColors[std::min(a_state.stage, kStageCount - 1)];
-			float       alpha = a_settings.opacity * sFade * (idle ? kIdleAlpha : 1.0f);
-
-			// Only the top stage pulses; anything more and the HUD never settles.
-			if (!idle && a_settings.pulseAtCritical && a_state.stage >= kStageCount - 1) {
-				const auto now = static_cast<float>(ImGui::GetTime());
-				alpha *= 0.62f + 0.38f * (0.5f + 0.5f * std::sin(now * 4.2f));
-			}
+			const ImU32 color = Layout::StageColor(a_widget, a_state);
+			const float alpha = Layout::StageAlpha(a_settings, a_state, Layout::Fade(), ImGui::GetTime());
 
 			switch (a_widget.style) {
 			case WidgetStyle::kIcon:
@@ -691,6 +610,15 @@ namespace StarfrostWidgets::Widgets
 				"Red circle = health, blue diamond = magicka,\n"
 				"green triangle = stamina, orange square = warmth.");
 
+			ImGui::TextDisabled(Skin::Active() ?
+					"Drawn by Interface/StarfrostWidgets.swf" :
+					"Drawn by the built-in vector drawing");
+			ImGui::SetItemTooltip(
+				"A reskin is a mod shipping its own Interface/StarfrostWidgets.swf.\n"
+				"Set iRenderer in the ini to force one renderer or the other.\n"
+				"Changing it takes effect on the next game load.");
+
+			ImGui::BeginDisabled(Skin::Active());
 			int target = static_cast<int>(a_settings.renderTarget);
 			if (ImGui::Combo("Draw into", &target, "Auto\0Swap chain\0Game framebuffer\0")) {
 				a_settings.renderTarget = static_cast<RenderTarget>(target);
@@ -699,7 +627,9 @@ namespace StarfrostWidgets::Widgets
 				"Frame generation composites the back buffer itself, so widgets drawn there get\n"
 				"overwritten. Auto and Game framebuffer put them in the same layer as the vanilla\n"
 				"HUD, which survives that and is not interpolated. Switch to Swap chain only if\n"
-				"the widgets misbehave without frame generation.");
+				"the widgets misbehave without frame generation.\n\n"
+				"Only applies to the built-in drawing - a skin draws in the game's own UI pass.");
+			ImGui::EndDisabled();
 
 			ImGui::Separator();
 
@@ -796,10 +726,19 @@ namespace StarfrostWidgets::Widgets
 
 		const auto& io = ImGui::GetIO();
 
+		// The skin movie owns the fade while it is drawing, so only advance it here
+		// when the built-in drawing is the one on screen.
+		const bool skinned = Skin::SuppressBuiltIn();
+
 		if (editing) {
-			sFade = 1.0f;
-			sHoldRemaining = 0.0f;
-		} else if (UpdateFade(settings.enabled && !ShouldHideForUI(settings), io.DeltaTime) <= 0.001f) {
+			if (!Skin::Active()) {
+				Layout::ForceFade(1.0f);
+			}
+		} else if (skinned) {
+			sPositionsDirty = true;
+			return;
+		} else if (Layout::UpdateFade(settings.enabled && !Layout::ShouldHideForUI(settings),
+					   io.DeltaTime) <= 0.001f) {
 			sPositionsDirty = true;  // re-seed window positions next time we edit
 			return;
 		}
@@ -816,21 +755,12 @@ namespace StarfrostWidgets::Widgets
 			if (!widget.enabled) {
 				continue;
 			}
-			if (!editing) {
-				if (!state.available) {
-					continue;
-				}
-				// Injuries and the buff timers come from other mods, so they ignore Survival Mode.
-				if (IsSurvivalNeed(gauge) && settings.requireSurvivalMode && !survivalOn) {
-					continue;
-				}
-				if (widget.dynamic && state.stage < widget.showFromStage) {
-					continue;
-				}
+			if (!editing && !Layout::GaugeVisible(gauge, settings, state, survivalOn)) {
+				continue;
 			}
 
 			const float  scale = widget.scale * settings.globalScale;
-			const ImVec2 size = BoxSize(widget, scale);
+			const ImVec2 size = Layout::BoxSize(widget, scale);
 			const ImVec2 origin{ widget.posX * display.x, widget.posY * display.y };
 
 			if (!editing) {
@@ -856,7 +786,10 @@ namespace StarfrostWidgets::Widgets
 				list->AddRectFilled(windowPos, windowPos + size, IM_COL32(255, 255, 255, hovered ? 34 : 16), 6.0f);
 				list->AddRect(windowPos, windowPos + size, IM_COL32(255, 210, 140, hovered ? 220 : 130), 6.0f, 0, 1.5f);
 
-				DrawGaugeBody(list, windowPos, size, gauge, widget, state, settings, scale);
+				// A skin is already drawing the art underneath these boxes.
+				if (!skinned) {
+					DrawGaugeBody(list, windowPos, size, gauge, widget, state, settings, scale);
+				}
 				AddCenteredText(list, { windowPos.x + size.x * 0.5f, windowPos.y - 9.0f },
 					ImGui::GetFontSize(), IM_COL32(255, 220, 160, 235), kNames[i]);
 

@@ -2,6 +2,7 @@
 #include "Menus.h"
 #include "Overlay.h"
 #include "Settings.h"
+#include "Skin.h"
 #include "SurvivalData.h"
 
 #include <Version.h>
@@ -18,6 +19,7 @@ namespace
 			SurvivalData::GetSingleton()->ResolveForms();
 			Input::GetSingleton()->Install();
 			Menus::GetSingleton()->Install();
+			Skin::Install();
 			Overlay::Install();
 			break;
 
@@ -27,6 +29,7 @@ namespace
 			Input::GetSingleton()->LeaveEditMode();
 			Menus::GetSingleton()->Refresh();
 			SurvivalData::GetSingleton()->Refresh();
+			Skin::Show();
 			if (!Overlay::Installed()) {
 				Overlay::Install();  // the swap chain may have been late
 			}

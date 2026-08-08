@@ -93,6 +93,7 @@ namespace StarfrostWidgets
 		BuffForms foodBuff{};
 		BuffForms alcohol{};
 		BuffForms blessing{};
+		BuffForms bardSong{};
 
 		GaugeState states[kGaugeCount]{};
 		bool       resolved{ false };

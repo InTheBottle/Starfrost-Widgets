@@ -7,7 +7,7 @@ namespace StarfrostWidgets
 	namespace
 	{
 		constexpr const char* kSections[kGaugeCount] = {
-			"Hunger", "Sleep", "Injury", "Cold", "FoodBuff", "Alcohol", "Blessing", "Stress"
+			"Hunger", "Sleep", "Injury", "Cold", "FoodBuff", "Alcohol", "Blessing", "Stress", "Lute"
 		};
 		static_assert(kSections[kGaugeCount - 1] != nullptr, "A new Gauge needs an ini section name");
 
@@ -53,7 +53,7 @@ namespace StarfrostWidgets
 	{
 		// Stacked down the left edge, clear of the compass and the vanilla meters.
 		constexpr float kDefaultY[kGaugeCount] = {
-			0.300f, 0.375f, 0.450f, 0.525f, 0.600f, 0.675f, 0.750f, 0.825f
+			0.300f, 0.375f, 0.450f, 0.525f, 0.600f, 0.675f, 0.750f, 0.825f, 0.900f
 		};
 		static_assert(kDefaultY[kGaugeCount - 1] != 0.0f, "A new Gauge needs a default position");
 
@@ -105,6 +105,8 @@ namespace StarfrostWidgets
 		pollInterval = std::clamp(ReadFloat(ini, "General", "fPollInterval", pollInterval), 0.05f, 5.0f);
 		renderTarget = static_cast<RenderTarget>(std::clamp(
 			ini.GetLongValue("General", "iRenderTarget", static_cast<long>(renderTarget)), 0L, 2L));
+		renderer = static_cast<Renderer>(std::clamp(
+			ini.GetLongValue("General", "iRenderer", static_cast<long>(renderer)), 0L, 2L));
 
 		for (std::size_t i = 0; i < kGaugeCount; ++i) {
 			const auto* section = kSections[i];
@@ -158,7 +160,7 @@ namespace StarfrostWidgets
 		ini.SetBoolValue("General", "bShowValues", showValues,
 			"; Print the raw need value under each widget.");
 		ini.SetBoolValue("General", "bShowTimers", showTimers,
-			"; Print the time left under the buff widgets (food, alcohol, blessing).");
+			"; Print the time left under the buff widgets (food, alcohol, blessing, lute).");
 		ini.SetBoolValue("General", "bShowAttributes", showAttributes,
 			"; Badge the buff widgets with what they fortify: a red circle for health,\n"
 			"; a blue diamond for magicka, a green triangle for stamina, an orange\n"
@@ -171,6 +173,14 @@ namespace StarfrostWidgets
 			"; Where the overlay draws. 0 = auto, 1 = swap chain back buffer,\n"
 			"; 2 = the game's framebuffer. Frame generation needs 0 or 2, because it\n"
 			"; composites the back buffer itself and would overwrite the widgets.",
+			false);
+		ini.SetLongValue("General", "iRenderer", static_cast<long>(renderer),
+			"; Which renderer draws the widgets.\n"
+			";   0 = auto      - Interface/StarfrostWidgets.swf if it loads, built-in drawing otherwise\n"
+			";   1 = built-in  - ignore any installed skin\n"
+			";   2 = skin only - draw nothing if the skin fails, so a broken one is obvious\n"
+			"; A reskin is a mod that ships its own Interface/StarfrostWidgets.swf and wins\n"
+			"; the overwrite. iRenderTarget only applies to the built-in drawing.",
 			false);
 
 		for (std::size_t i = 0; i < kGaugeCount; ++i) {
