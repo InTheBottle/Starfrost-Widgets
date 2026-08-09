@@ -19,17 +19,45 @@ namespace StarfrostWidgets::Skin
 
 		constexpr double kHandoverSeconds = 5.0;
 		constexpr int    kResolveAttempts = 300;
+		constexpr double kStaleSeconds = 2.0;
+		constexpr double kWatchdogSeconds = 1.0;
+		constexpr float  kReassertSeconds = 5.0f;
 
-		std::atomic<bool>   gMovieLoaded{ false };
-		std::atomic<bool>   gDriving{ false };
-		std::atomic<double> gLoadedAt{ 0.0 };
-		bool                gRegistered{ false };
+		std::atomic<bool>        gMovieLoaded{ false };
+		std::atomic<bool>        gDriving{ false };
+		std::atomic<double>      gLoadedAt{ 0.0 };
+		std::atomic<double>      gLastDisplay{ 0.0 };
+		std::atomic<const void*> gInstance{ nullptr };
+		double                   gLastWatchdog{ 0.0 };
+		bool                     gStalled{ false };
+		bool                     gRegistered{ false };
 
 		[[nodiscard]] double Now()
 		{
 			return std::chrono::duration<double>(
 				std::chrono::steady_clock::now().time_since_epoch())
 			    .count();
+		}
+
+		[[nodiscard]] bool Fresh()
+		{
+			return Now() - gLastDisplay.load(std::memory_order_relaxed) < kStaleSeconds;
+		}
+
+		[[nodiscard]] const char* MessageName(RE::UI_MESSAGE_TYPE a_type)
+		{
+			switch (a_type) {
+			case RE::UI_MESSAGE_TYPE::kShow:
+				return "show";
+			case RE::UI_MESSAGE_TYPE::kReshow:
+				return "reshow";
+			case RE::UI_MESSAGE_TYPE::kHide:
+				return "hide";
+			case RE::UI_MESSAGE_TYPE::kForceHide:
+				return "force hide";
+			default:
+				return "other";
+			}
 		}
 
 		class MovieLog : public RE::GFxLog
@@ -133,7 +161,7 @@ namespace StarfrostWidgets::Skin
 		// What was last pushed, so an unchanged frame costs nothing.
 		struct Pushed
 		{
-			bool        visible{ true };
+			std::uint8_t visible{ 2 };
 			float       x{ -1.0f };
 			float       y{ -1.0f };
 			float       scale{ -1.0f };
@@ -168,7 +196,9 @@ namespace StarfrostWidgets::Skin
 					// screen pixels, which is what the fractional positions expect.
 					uiMovie->SetViewAlignment(RE::GFxMovieView::AlignType::kTopLeft);
 					gLoadedAt.store(Now(), std::memory_order_relaxed);
+					gLastDisplay.store(Now(), std::memory_order_relaxed);
 					gMovieLoaded.store(true, std::memory_order_release);
+					gInstance.store(this, std::memory_order_release);
 					SKSE::log::info("Widget movie loaded, waiting for it to start drawing");
 				} else {
 					SKSE::log::warn("No widget movie at Interface/{}.swf", Skin::kMovieName);
@@ -182,8 +212,47 @@ namespace StarfrostWidgets::Skin
 
 			~WidgetMenu() override
 			{
+				const void* live = gInstance.load(std::memory_order_acquire);
+				if (live && live != this) {
+					return;
+				}
+
+				gInstance.store(nullptr, std::memory_order_release);
 				gDriving.store(false, std::memory_order_release);
 				gMovieLoaded.store(false, std::memory_order_release);
+				SKSE::log::info("Widget menu closed");
+			}
+
+			RE::UI_MESSAGE_RESULTS ProcessMessage(RE::UIMessage& a_message) override
+			{
+				using Type = RE::UI_MESSAGE_TYPE;
+
+				const auto type = *a_message.type;
+				switch (type) {
+				case Type::kShow:
+				case Type::kReshow:
+					SKSE::log::info("Widget menu got a {} message", MessageName(type));
+					_wake.store(true, std::memory_order_release);
+					break;
+
+				case Type::kHide:
+				case Type::kForceHide: {
+					const auto ui = RE::UI::GetSingleton();
+					if (ui && ui->closingAllMenus) {
+						SKSE::log::info("Widget menu got a {} while every menu is closing, standing down",
+							MessageName(type));
+						break;
+					}
+					SKSE::log::info("Widget menu refused a {} message", MessageName(type));
+					_wake.store(true, std::memory_order_release);
+					return RE::UI_MESSAGE_RESULTS::kHandled;
+				}
+
+				default:
+					break;
+				}
+
+				return RE::IMenu::ProcessMessage(a_message);
 			}
 
 			void AdvanceMovie(float a_interval, std::uint32_t a_currentTime) override
@@ -191,6 +260,26 @@ namespace StarfrostWidgets::Skin
 				if (!uiMovie) {
 					return;
 				}
+
+				if (_wake.exchange(false, std::memory_order_acquire)) {
+					Invalidate();
+				}
+
+				if (!uiMovie->GetVisible()) {
+					if (!_hidden) {
+						_hidden = true;
+						SKSE::log::warn("Widget movie had been hidden, showing it again");
+					}
+					uiMovie->SetVisible(true);
+					Invalidate();
+				} else {
+					_hidden = false;
+				}
+
+				if ((!_resolved && !_failed) || Menus::GetSingleton()->LoadingScreenOpen()) {
+					gLastDisplay.store(Now(), std::memory_order_relaxed);
+				}
+
 				if (gMovieLoaded.load(std::memory_order_acquire)) {
 					Push(a_interval);
 				}
@@ -199,13 +288,24 @@ namespace StarfrostWidgets::Skin
 
 			void PostDisplay() override
 			{
-				if (_resolved && !gDriving.exchange(true, std::memory_order_release)) {
-					SKSE::log::info("The skin is drawing the widgets");
+				if (_resolved) {
+					gLastDisplay.store(Now(), std::memory_order_relaxed);
+					if (!gDriving.exchange(true, std::memory_order_release)) {
+						SKSE::log::info("The skin is drawing the widgets");
+					}
 				}
 				RE::IMenu::PostDisplay();
 			}
 
 		private:
+			void Invalidate()
+			{
+				for (auto& pushed : _pushed) {
+					pushed = Pushed{};
+				}
+				_sinceReassert = 0.0f;
+			}
+
 			bool Resolve()
 			{
 				if (_resolved || _failed || !uiMovie) {
@@ -323,6 +423,13 @@ namespace StarfrostWidgets::Skin
 				auto&      settings = *Settings::GetSingleton();
 				const auto data = SurvivalData::GetSingleton();
 				const bool editing = Input::GetSingleton()->EditMode();
+				const bool loading = Menus::GetSingleton()->LoadingScreenOpen();
+
+				_sinceReassert += a_deltaTime;
+				if ((_wasLoading && !loading) || _sinceReassert >= kReassertSeconds) {
+					Invalidate();
+				}
+				_wasLoading = loading;
 
 				if (editing) {
 					Layout::ForceFade(1.0f);
@@ -383,9 +490,9 @@ namespace StarfrostWidgets::Skin
 				                         (a_fade > 0.001f &&
 											 Layout::GaugeVisible(a_gauge, a_settings, a_state, a_survivalOn));
 
-				if (visible != last.visible) {
+				if (last.visible != static_cast<std::uint8_t>(visible)) {
 					SetVisible(clips.root, visible);
-					last.visible = visible;
+					last.visible = static_cast<std::uint8_t>(visible);
 				}
 				if (!visible) {
 					return;
@@ -606,13 +713,17 @@ namespace StarfrostWidgets::Skin
 				SetVisible(a_clips.caption, true);
 			}
 
-			GaugeClips _clips[kGaugeCount]{};
-			Pushed     _pushed[kGaugeCount]{};
-			bool       _resolved{ false };
-			bool       _failed{ false };
-			int        _attempts{ 0 };
-			float      _poll{ 0.0f };
-			double     _time{ 0.0 };
+			GaugeClips        _clips[kGaugeCount]{};
+			Pushed            _pushed[kGaugeCount]{};
+			std::atomic<bool> _wake{ false };
+			bool              _resolved{ false };
+			bool              _failed{ false };
+			bool              _wasLoading{ false };
+			bool              _hidden{ false };
+			int               _attempts{ 0 };
+			float             _poll{ 0.0f };
+			float             _sinceReassert{ 0.0f };
+			double            _time{ 0.0 };
 		};
 	}
 
@@ -642,17 +753,61 @@ namespace StarfrostWidgets::Skin
 		}
 
 		const auto ui = RE::UI::GetSingleton();
-		if (ui && ui->GetMenu(kMenuName)) {
+		if (ui && ui->IsMenuOpen(kMenuName)) {
 			return;
 		}
 		if (const auto queue = RE::UIMessageQueue::GetSingleton()) {
+			SKSE::log::info("Asking for the widget menu");
+			queue->AddMessage(kMenuName, RE::UI_MESSAGE_TYPE::kShow, nullptr);
+		}
+	}
+
+	void Tick()
+	{
+		if (!gRegistered || Settings::GetSingleton()->renderer == Renderer::kBuiltIn) {
+			return;
+		}
+
+		const auto now = Now();
+		if (now - gLastWatchdog < kWatchdogSeconds) {
+			return;
+		}
+		gLastWatchdog = now;
+
+		const auto ui = RE::UI::GetSingleton();
+		if (!ui || !ui->IsMenuOpen(RE::HUDMenu::MENU_NAME)) {
+			return;
+		}
+
+		const auto queue = RE::UIMessageQueue::GetSingleton();
+		if (!queue) {
+			return;
+		}
+
+		if (!ui->IsMenuOpen(kMenuName)) {
+			SKSE::log::warn("The widget menu is {}, opening it again",
+				ui->GetMenu(kMenuName) ? "off the menu stack" : "gone");
+			gStalled = false;
+			queue->AddMessage(kMenuName, RE::UI_MESSAGE_TYPE::kShow, nullptr);
+			return;
+		}
+
+		if (Fresh() || ui->IsMenuOpen(RE::LoadingMenu::MENU_NAME)) {
+			gStalled = false;
+			return;
+		}
+
+		if (!gStalled) {
+			gStalled = true;
+			SKSE::log::warn("The widget menu is open but has not drawn for {:.1f}s, nudging it",
+				now - gLastDisplay.load(std::memory_order_relaxed));
 			queue->AddMessage(kMenuName, RE::UI_MESSAGE_TYPE::kShow, nullptr);
 		}
 	}
 
 	bool Active()
 	{
-		return gDriving.load(std::memory_order_acquire) &&
+		return gDriving.load(std::memory_order_acquire) && Fresh() &&
 		       Settings::GetSingleton()->renderer != Renderer::kBuiltIn;
 	}
 
@@ -662,7 +817,7 @@ namespace StarfrostWidgets::Skin
 			return true;
 		}
 
-		return gMovieLoaded.load(std::memory_order_acquire) &&
+		return gMovieLoaded.load(std::memory_order_acquire) && Fresh() &&
 		       Now() - gLoadedAt.load(std::memory_order_relaxed) < kHandoverSeconds;
 	}
 }

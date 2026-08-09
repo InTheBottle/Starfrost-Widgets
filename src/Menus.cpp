@@ -1,6 +1,7 @@
 #include "Menus.h"
 
 #include "Input.h"
+#include "Skin.h"
 
 namespace StarfrostWidgets
 {
@@ -36,6 +37,8 @@ namespace StarfrostWidgets
 		DropClosedMenus(ui);
 
 		EnforceEditModeGate();
+
+		Skin::Tick();
 	}
 
 	void Menus::DropClosedMenus(RE::UI* a_ui)
@@ -116,8 +119,14 @@ namespace StarfrostWidgets
 		// Both carry kAlwaysOpen, so CoversScreen never counts either one.
 		if (a_event->menuName == RE::HUDMenu::MENU_NAME) {
 			hudOpen.store(a_event->opening, std::memory_order_relaxed);
+			if (a_event->opening) {
+				Skin::Show();
+			}
 		} else if (a_event->menuName == RE::LoadingMenu::MENU_NAME) {
 			loadingOpen.store(a_event->opening, std::memory_order_relaxed);
+			if (!a_event->opening) {
+				Skin::Show();
+			}
 		}
 
 		{

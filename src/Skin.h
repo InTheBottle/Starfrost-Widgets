@@ -8,6 +8,9 @@ namespace StarfrostWidgets::Skin
 	// Opens the menu once a game is up, if a movie was found.
 	void Show();
 
+	// Main thread only. Reopens the menu if something closed it.
+	void Tick();
+
 	// True when the movie loaded and is the thing drawing the HUD.
 	[[nodiscard]] bool Active();
 
