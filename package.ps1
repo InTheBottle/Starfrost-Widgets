@@ -6,7 +6,11 @@ param(
     [string] $Version,
 
     # Skip cmake and package whatever is already built.
-    [switch] $NoBuild
+    [switch] $NoBuild,
+
+    # Regenerate Interface\StarfrostWidgets.swf from tools\swfgen. Off by default:
+    # the movie in the repo is the shipped artwork.
+    [switch] $RebuildSkin
 )
 
 $ErrorActionPreference = 'Stop'
@@ -32,6 +36,9 @@ if (-not $NoBuild) {
     if (-not $env:VCPKG_ROOT) { throw 'VCPKG_ROOT is not set.' }
     Invoke-Native 'cmake configure' { cmake --preset release }
     Invoke-Native 'cmake build' { cmake --build --preset release }
+}
+
+if ($RebuildSkin) {
     Invoke-Native 'skin build' { python -m tools.swfgen.build }
     Invoke-Native 'skin validate' { python -m tools.swfgen.validate }
 }

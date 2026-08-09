@@ -137,19 +137,12 @@ if(DEFINED OUTPUT_FOLDER)
 		VERBATIM
 	)
 
-	# copy_if_different, so a locally edited ini survives a rebuild.
-	add_custom_command(
-		TARGET ${PROJECT_NAME}
-		POST_BUILD
+	# Its own target: a POST_BUILD command is skipped when the DLL is up to date,
+	# so editing only the ini or the movie would never reach the game.
+	add_custom_target(${PROJECT_NAME}Assets ALL
+		COMMAND "${CMAKE_COMMAND}" -E make_directory "${OUTPUT_FOLDER}"
 		COMMAND "${CMAKE_COMMAND}" -E copy_if_different
 			"${CMAKE_CURRENT_SOURCE_DIR}/SKSE/Plugins/StarfrostWidgets.ini" "${OUTPUT_FOLDER}"
-		VERBATIM
-	)
-
-	# The default skin. A reskin mod overwrites this file from a later mod folder.
-	add_custom_command(
-		TARGET ${PROJECT_NAME}
-		POST_BUILD
 		COMMAND "${CMAKE_COMMAND}" -E make_directory "${INTERFACE_FOLDER}"
 		COMMAND "${CMAKE_COMMAND}" -E copy_if_different
 			"${CMAKE_CURRENT_SOURCE_DIR}/Interface/StarfrostWidgets.swf" "${INTERFACE_FOLDER}"

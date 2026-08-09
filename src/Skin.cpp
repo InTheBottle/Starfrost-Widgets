@@ -4,6 +4,7 @@
 #include "Input.h"
 #include "Layout.h"
 #include "Menus.h"
+#include "Overlay.h"
 #include "Settings.h"
 #include "SurvivalData.h"
 
@@ -16,8 +17,44 @@ namespace StarfrostWidgets::Skin
 		static_assert(std::size(Skin::kGaugeClips) == kGaugeCount,
 			"The generated clip list and the Gauge enum have drifted apart - rerun tools/swfgen/build.py");
 
-		std::atomic<bool> gLoaded{ false };
-		bool              gRegistered{ false };
+		constexpr double kHandoverSeconds = 5.0;
+		constexpr int    kResolveAttempts = 300;
+
+		std::atomic<bool>   gMovieLoaded{ false };
+		std::atomic<bool>   gDriving{ false };
+		std::atomic<double> gLoadedAt{ 0.0 };
+		bool                gRegistered{ false };
+
+		[[nodiscard]] double Now()
+		{
+			return std::chrono::duration<double>(
+				std::chrono::steady_clock::now().time_since_epoch())
+			    .count();
+		}
+
+		class MovieLog : public RE::GFxLog
+		{
+		public:
+			void LogMessageVarg(LogMessageType a_type, const char* a_fmt, std::va_list a_args) override
+			{
+				char text[1024]{};
+				if (std::vsnprintf(text, sizeof(text), a_fmt, a_args) <= 0) {
+					return;
+				}
+
+				std::string_view message{ text };
+				while (!message.empty() && (message.back() == '\n' || message.back() == '\r')) {
+					message.remove_suffix(1);
+				}
+
+				const auto subtype = static_cast<std::uint32_t>(a_type) & 0x0F;
+				if (subtype == static_cast<std::uint32_t>(LogMessageType::kMessageType_Error)) {
+					SKSE::log::error("Scaleform: {}", message);
+				} else {
+					SKSE::log::info("Scaleform: {}", message);
+				}
+			}
+		};
 
 		// A frame is addressed by its label, and every frame is labelled with its
 		// own number, so the lookup lands on the same frame either way it is read.
@@ -71,19 +108,39 @@ namespace StarfrostWidgets::Skin
 			RE::GFxValue badge[kBuffAttributeCount];
 			RE::GFxValue caption;
 			RE::GFxValue slot[Skin::kCaptionSlots];
-			bool         resolved{ false };
+
+			std::size_t ringFillFrames{ 1 };
+			std::size_t barFillFrames{ 1 };
+			std::size_t iconFrames{ 1 };
+			std::size_t slotFrames{ 1 };
 		};
+
+		[[nodiscard]] std::size_t FrameForFraction(float a_fraction, std::size_t a_frames)
+		{
+			if (a_frames <= 1) {
+				return 1;
+			}
+			const auto last = static_cast<float>(a_frames - 1);
+			return 1 + static_cast<std::size_t>(std::clamp(a_fraction, 0.0f, 1.0f) * last + 0.5f);
+		}
+
+		void GotoFrame(RE::GFxValue& a_clip, std::size_t a_frame)
+		{
+			char buffer[8]{};
+			a_clip.GotoAndStop(FrameLabel(a_frame, buffer));
+		}
 
 		// What was last pushed, so an unchanged frame costs nothing.
 		struct Pushed
 		{
-			bool        visible{ false };
+			bool        visible{ true };
 			float       x{ -1.0f };
 			float       y{ -1.0f };
 			float       scale{ -1.0f };
 			float       alpha{ -1.0f };
 			WidgetStyle style{ WidgetStyle::kRing };
-			std::size_t fillFrame{ SIZE_MAX };
+			std::size_t ringFrame{ SIZE_MAX };
+			std::size_t barFrame{ SIZE_MAX };
 			std::size_t tier{ SIZE_MAX };
 			ImU32       color{ 0 };
 			std::uint32_t attributes{ UINT32_MAX };
@@ -101,13 +158,18 @@ namespace StarfrostWidgets::Skin
 
 				auto* manager = RE::BSScaleformManager::GetSingleton();
 				const bool loaded = manager && manager->LoadMovieEx(this, Skin::kMovieName,
-					RE::GFxMovieView::ScaleModeType::kNoScale, [](RE::GFxMovieDef*) {});
+					RE::GFxMovieView::ScaleModeType::kNoScale, [](RE::GFxMovieDef* a_def) {
+						static auto log = RE::make_gptr<MovieLog>();
+						a_def->SetState(RE::GFxState::StateType::kLog, log.get());
+					});
 
 				if (loaded && uiMovie) {
 					// Top-left alignment with no scaling makes _root coordinates plain
 					// screen pixels, which is what the fractional positions expect.
 					uiMovie->SetViewAlignment(RE::GFxMovieView::AlignType::kTopLeft);
-					gLoaded.store(true, std::memory_order_release);
+					gLoadedAt.store(Now(), std::memory_order_relaxed);
+					gMovieLoaded.store(true, std::memory_order_release);
+					SKSE::log::info("Widget movie loaded, waiting for it to start drawing");
 				} else {
 					SKSE::log::warn("No widget movie at Interface/{}.swf", Skin::kMovieName);
 				}
@@ -118,15 +180,29 @@ namespace StarfrostWidgets::Skin
 				menuFlags.set(Flag::kAlwaysOpen, Flag::kRequiresUpdate, Flag::kAllowSaving);
 			}
 
+			~WidgetMenu() override
+			{
+				gDriving.store(false, std::memory_order_release);
+				gMovieLoaded.store(false, std::memory_order_release);
+			}
+
 			void AdvanceMovie(float a_interval, std::uint32_t a_currentTime) override
 			{
 				if (!uiMovie) {
 					return;
 				}
-				if (gLoaded.load(std::memory_order_acquire)) {
+				if (gMovieLoaded.load(std::memory_order_acquire)) {
 					Push(a_interval);
 				}
 				RE::IMenu::AdvanceMovie(a_interval, a_currentTime);
+			}
+
+			void PostDisplay() override
+			{
+				if (_resolved && !gDriving.exchange(true, std::memory_order_release)) {
+					SKSE::log::info("The skin is drawing the widgets");
+				}
+				RE::IMenu::PostDisplay();
 			}
 
 		private:
@@ -136,55 +212,105 @@ namespace StarfrostWidgets::Skin
 					return _resolved;
 				}
 
+				const auto get = [&](RE::GFxValue& a_out, const std::string& a_path) {
+					return uiMovie->GetVariable(&a_out, a_path.c_str()) && a_out.IsDisplayObject();
+				};
+
+				const auto frames = [&](const RE::GFxValue& a_clip, const std::string& a_path) -> std::size_t {
+					RE::GFxValue total;
+					if (a_clip.IsDisplayObject() &&
+						uiMovie->GetVariable(&total, (a_path + "._totalframes").c_str()) &&
+						total.IsNumber() && total.GetNumber() >= 1.0) {
+						return static_cast<std::size_t>(total.GetNumber());
+					}
+					return 1;
+				};
+
+				std::size_t bound = 0;
+				std::size_t drawable = 0;
+				std::string missing;
+
 				for (std::size_t i = 0; i < kGaugeCount; ++i) {
 					auto&             clips = _clips[i];
 					const std::string base = std::format("_root.{}", Skin::kGaugeClips[i]);
 
-					const auto get = [&](RE::GFxValue& a_out, const std::string& a_path) {
-						return uiMovie->GetVariable(&a_out, a_path.c_str()) && a_out.IsDisplayObject();
+					if (!get(clips.root, base)) {
+						continue;
+					}
+					++bound;
+
+					const auto want = [&](RE::GFxValue& a_out, const char* a_suffix) {
+						if (get(a_out, base + a_suffix)) {
+							return true;
+						}
+						if (missing.size() < 200) {
+							missing += ' ';
+							missing += Skin::kGaugeClips[i];
+							missing += a_suffix;
+						}
+						return false;
 					};
 
-					clips.resolved =
-						get(clips.root, base) &&
-						get(clips.ring, base + ".ring") &&
-						get(clips.ringFill, base + ".ring.fill") &&
-						get(clips.bar, base + ".bar") &&
-						get(clips.barFill, base + ".bar.fill") &&
-						get(clips.icon, base + ".icon") &&
-						get(clips.caption, base + ".caption");
+					const bool ring = want(clips.ring, ".ring");
+					const bool ringFill = want(clips.ringFill, ".ring.fill");
+					const bool bar = want(clips.bar, ".bar");
+					const bool barFill = want(clips.barFill, ".bar.fill");
+					const bool icon = want(clips.icon, ".icon");
+					want(clips.caption, ".caption");
 
-					for (std::uint32_t badge = 0; badge < kBuffAttributeCount && clips.resolved; ++badge) {
-						clips.resolved = get(clips.badge[badge],
-							std::format("{}.badges.badge{}", base, badge));
+					for (std::uint32_t badge = 0; badge < kBuffAttributeCount; ++badge) {
+						get(clips.badge[badge], std::format("{}.badges.badge{}", base, badge));
 					}
-					for (std::size_t slot = 0; slot < Skin::kCaptionSlots && clips.resolved; ++slot) {
-						clips.resolved = get(clips.slot[slot],
-							std::format("{}.caption.c{}", base, slot));
+					for (std::size_t slot = 0; slot < Skin::kCaptionSlots; ++slot) {
+						get(clips.slot[slot], std::format("{}.caption.c{}", base, slot));
 					}
 
-					if (!clips.resolved) {
-						SKSE::log::error("Skin is missing clips under {} - falling back to the built-in drawing", base);
-						gLoaded.store(false, std::memory_order_release);
-						_failed = true;
-						return false;
+					if ((ring && ringFill) || (bar && barFill) || icon) {
+						++drawable;
 					}
+
+					clips.ringFillFrames = frames(clips.ringFill, base + ".ring.fill");
+					clips.barFillFrames = frames(clips.barFill, base + ".bar.fill");
+					clips.iconFrames = frames(clips.icon, base + ".icon");
+					clips.slotFrames = frames(clips.slot[0], base + ".caption.c0");
+				}
+
+				if (drawable < kGaugeCount && ++_attempts < kResolveAttempts) {
+					return false;
+				}
+
+				if (drawable == 0) {
+					SKSE::log::error("Skin bound {} of {} gauge clips, none of which carry ring, bar or "
+									 "icon art - falling back to the built-in drawing. Missing:{}",
+						bound, kGaugeCount, missing.empty() ? " _root.sfw_*" : missing.c_str());
+					gDriving.store(false, std::memory_order_release);
+					gMovieLoaded.store(false, std::memory_order_release);
+					_failed = true;
+					return false;
+				}
+
+				if (!missing.empty()) {
+					SKSE::log::warn("Skin is missing clips, those parts will not draw:{}", missing);
 				}
 
 				// Nothing in the movie stops itself, so park every multi-frame clip
 				// on its first frame before it plays through on its own.
-				char buffer[8]{};
-				const char* first = FrameLabel(1, buffer);
 				for (auto& clips : _clips) {
-					clips.ringFill.GotoAndStop(first);
-					clips.barFill.GotoAndStop(first);
-					clips.icon.GotoAndStop(first);
+					for (auto* clip : { &clips.ringFill, &clips.barFill, &clips.icon }) {
+						if (clip->IsDisplayObject()) {
+							GotoFrame(*clip, 1);
+						}
+					}
 					for (auto& slot : clips.slot) {
-						slot.GotoAndStop(first);
+						if (slot.IsDisplayObject()) {
+							GotoFrame(slot, 1);
+						}
 					}
 				}
 
 				_resolved = true;
-				SKSE::log::info("Widget movie resolved, {} gauges bound", kGaugeCount);
+				SKSE::log::info("Widget movie resolved, {} of {} gauges have drawable art",
+					drawable, kGaugeCount);
 				return true;
 			}
 
@@ -216,6 +342,28 @@ namespace StarfrostWidgets::Skin
 					PushGauge(static_cast<Gauge>(i), settings, data->Get(static_cast<Gauge>(i)),
 						survivalOn, editing, fade, width, height);
 				}
+
+				Pump(settings, a_deltaTime);
+			}
+
+			void Pump(const Settings& a_settings, float a_deltaTime)
+			{
+				if (Overlay::Installed()) {
+					return;
+				}
+
+				_poll += a_deltaTime;
+				if (_poll < a_settings.pollInterval) {
+					return;
+				}
+				_poll = 0.0f;
+
+				if (const auto tasks = SKSE::GetTaskInterface()) {
+					tasks->AddTask([]() {
+						Menus::GetSingleton()->Refresh();
+						SurvivalData::GetSingleton()->Refresh();
+					});
+				}
 			}
 
 			void PushGauge(Gauge a_gauge, const Settings& a_settings, const GaugeState& a_state,
@@ -225,6 +373,10 @@ namespace StarfrostWidgets::Skin
 				auto&      clips = _clips[index];
 				auto&      last = _pushed[index];
 				const auto& widget = a_settings.Widget(a_gauge);
+
+				if (!clips.root.IsDisplayObject()) {
+					return;
+				}
 
 				const bool visible = a_editing ?
 				                         widget.enabled :
@@ -263,7 +415,7 @@ namespace StarfrostWidgets::Skin
 				}
 
 				PushStyle(clips, last, widget, size, scale);
-				PushFills(clips, last, a_state, widget);
+				PushFills(clips, last, a_state);
 				PushColor(clips, last, widget, a_state);
 				PushBadges(clips, last, a_settings, a_state, size, scale);
 				PushCaption(clips, last, a_settings, a_state, size, scale);
@@ -280,18 +432,34 @@ namespace StarfrostWidgets::Skin
 
 				const float outer = std::min(a_size.x, a_size.y) * 0.5f;
 
+				if (a_clips.ring.IsDisplayObject()) {
+					const bool ring = a_widget.style == WidgetStyle::kRing;
+					SetVisible(a_clips.ring, ring);
+					if (ring) {
+						SetTransform(a_clips.ring, a_size.x * 0.5f, a_size.y * 0.5f,
+							outer * 100.0f / Skin::kRingArtRadius);
+					}
+				}
+
+				if (a_clips.bar.IsDisplayObject()) {
+					const bool bar = a_widget.style == WidgetStyle::kBar;
+					SetVisible(a_clips.bar, bar);
+					if (bar) {
+						SetTransform(a_clips.bar, 0.0, 0.0, a_size.x * 100.0f / Skin::kBarArtWidth);
+					}
+				}
+
+				if (!a_clips.icon.IsDisplayObject()) {
+					return;
+				}
+
 				switch (a_widget.style) {
 				case WidgetStyle::kIcon:
-					SetVisible(a_clips.ring, false);
-					SetVisible(a_clips.bar, false);
 					SetTransform(a_clips.icon, a_size.x * 0.5f, a_size.y * 0.5f,
 						outer * 0.78f * 100.0f / Skin::kIconArtRadius);
 					break;
 
 				case WidgetStyle::kBar: {
-					SetVisible(a_clips.ring, false);
-					SetVisible(a_clips.bar, true);
-					SetTransform(a_clips.bar, 0.0, 0.0, a_size.x * 100.0f / Skin::kBarArtWidth);
 					const float iconRadius = a_size.y * 0.42f;
 					SetTransform(a_clips.icon, iconRadius, a_size.y * 0.5f,
 						iconRadius * 100.0f / Skin::kIconArtRadius);
@@ -300,38 +468,40 @@ namespace StarfrostWidgets::Skin
 
 				case WidgetStyle::kRing:
 				default:
-					SetVisible(a_clips.bar, false);
-					SetVisible(a_clips.ring, true);
-					SetTransform(a_clips.ring, a_size.x * 0.5f, a_size.y * 0.5f,
-						outer * 100.0f / Skin::kRingArtRadius);
 					SetTransform(a_clips.icon, a_size.x * 0.5f, a_size.y * 0.5f,
 						outer * 0.62f * 100.0f / Skin::kIconArtRadius);
 					break;
 				}
 			}
 
-			void PushFills(GaugeClips& a_clips, Pushed& a_last, const GaugeState& a_state,
-				const WidgetSettings& a_widget)
+			void PushFills(GaugeClips& a_clips, Pushed& a_last, const GaugeState& a_state)
 			{
-				const auto frame = static_cast<std::size_t>(
-					std::clamp(a_state.fill, 0.0f, 1.0f) * static_cast<float>(Skin::kFillSteps) + 0.5f);
+				const float fill = std::clamp(a_state.fill, 0.0f, 1.0f);
 
-				if (frame != a_last.fillFrame) {
-					a_last.fillFrame = frame;
-					char buffer[8]{};
-					const char* label = FrameLabel(frame + 1, buffer);
-					a_clips.ringFill.GotoAndStop(label);
-					a_clips.barFill.GotoAndStop(label);
+				if (a_clips.ringFill.IsDisplayObject()) {
+					const auto frame = FrameForFraction(fill, a_clips.ringFillFrames);
+					if (frame != a_last.ringFrame) {
+						a_last.ringFrame = frame;
+						GotoFrame(a_clips.ringFill, frame);
+					}
 				}
 
+				if (a_clips.barFill.IsDisplayObject()) {
+					const auto frame = FrameForFraction(fill, a_clips.barFillFrames);
+					if (frame != a_last.barFrame) {
+						a_last.barFrame = frame;
+						GotoFrame(a_clips.barFill, frame);
+					}
+				}
+
+				// Only the injury icon carries tier frames; the rest hold a single one.
 				const auto tier = Layout::IconTier(a_state);
 				if (tier != a_last.tier) {
 					a_last.tier = tier;
-					char buffer[8]{};
-					// Only the injury icon carries tier frames; the rest hold a single one.
-					a_clips.icon.GotoAndStop(FrameLabel(tier + 1, buffer));
+					if (a_clips.icon.IsDisplayObject()) {
+						GotoFrame(a_clips.icon, std::min(tier + 1, a_clips.iconFrames));
+					}
 				}
-				(void)a_widget;
 			}
 
 			void PushColor(GaugeClips& a_clips, Pushed& a_last, const WidgetSettings& a_widget,
@@ -343,9 +513,11 @@ namespace StarfrostWidgets::Skin
 				}
 				a_last.color = color;
 
-				SetTint(a_clips.icon, color);
-				SetTint(a_clips.ringFill, color);
-				SetTint(a_clips.barFill, color);
+				for (auto* clip : { &a_clips.icon, &a_clips.ringFill, &a_clips.barFill }) {
+					if (clip->IsDisplayObject()) {
+						SetTint(*clip, color);
+					}
+				}
 			}
 
 			void PushBadges(GaugeClips& a_clips, Pushed& a_last, const Settings& a_settings,
@@ -366,8 +538,10 @@ namespace StarfrostWidgets::Skin
 					}
 				}
 
-				for (std::uint32_t i = 0; i < kBuffAttributeCount; ++i) {
-					SetVisible(a_clips.badge[i], false);
+				for (auto& badge : a_clips.badge) {
+					if (badge.IsDisplayObject()) {
+						SetVisible(badge, false);
+					}
 				}
 
 				if (count == 0) {
@@ -381,8 +555,10 @@ namespace StarfrostWidgets::Skin
 
 				for (std::uint32_t i = 0; i < count; ++i) {
 					auto& clip = a_clips.badge[present[i]];
-					SetTransform(clip, x, y, radius * 100.0f / Skin::kBadgeArtRadius);
-					SetVisible(clip, true);
+					if (clip.IsDisplayObject()) {
+						SetTransform(clip, x, y, radius * 100.0f / Skin::kBadgeArtRadius);
+						SetVisible(clip, true);
+					}
 					x += step;
 				}
 			}
@@ -390,6 +566,10 @@ namespace StarfrostWidgets::Skin
 			void PushCaption(GaugeClips& a_clips, Pushed& a_last, const Settings& a_settings,
 				const GaugeState& a_state, ImVec2 a_size, float a_scale)
 			{
+				if (!a_clips.caption.IsDisplayObject()) {
+					return;
+				}
+
 				std::string caption = Layout::CaptionFor(a_settings, a_state);
 				if (caption.size() > Skin::kCaptionSlots) {
 					caption.resize(Skin::kCaptionSlots);
@@ -406,11 +586,13 @@ namespace StarfrostWidgets::Skin
 
 				static constexpr std::string_view kOrder{ Skin::kGlyphOrder };
 				for (std::size_t slot = 0; slot < Skin::kCaptionSlots; ++slot) {
+					if (!a_clips.slot[slot].IsDisplayObject()) {
+						continue;
+					}
 					const auto found = slot < caption.size() ? kOrder.find(caption[slot]) :
 															   std::string_view::npos;
-					char       buffer[8]{};
-					a_clips.slot[slot].GotoAndStop(
-						FrameLabel((found == std::string_view::npos ? 0 : found) + 1, buffer));
+					const auto glyph = found == std::string_view::npos ? 0 : found;
+					GotoFrame(a_clips.slot[slot], std::min(glyph + 1, a_clips.slotFrames));
 				}
 
 				const float size = Layout::kCaptionSize * a_scale;
@@ -428,6 +610,8 @@ namespace StarfrostWidgets::Skin
 			Pushed     _pushed[kGaugeCount]{};
 			bool       _resolved{ false };
 			bool       _failed{ false };
+			int        _attempts{ 0 };
+			float      _poll{ 0.0f };
 			double     _time{ 0.0 };
 		};
 	}
@@ -468,12 +652,17 @@ namespace StarfrostWidgets::Skin
 
 	bool Active()
 	{
-		return gLoaded.load(std::memory_order_acquire) &&
+		return gDriving.load(std::memory_order_acquire) &&
 		       Settings::GetSingleton()->renderer != Renderer::kBuiltIn;
 	}
 
 	bool SuppressBuiltIn()
 	{
-		return Settings::GetSingleton()->renderer == Renderer::kSkin || Active();
+		if (Settings::GetSingleton()->renderer == Renderer::kSkin || Active()) {
+			return true;
+		}
+
+		return gMovieLoaded.load(std::memory_order_acquire) &&
+		       Now() - gLoadedAt.load(std::memory_order_relaxed) < kHandoverSeconds;
 	}
 }
