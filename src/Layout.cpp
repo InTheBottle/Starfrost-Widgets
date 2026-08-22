@@ -87,6 +87,28 @@ namespace StarfrostWidgets::Layout
 		return std::min(a_state.stage, kStageCount - 1) / 2;
 	}
 
+	std::size_t IconFrame(const GaugeState& a_state, std::size_t a_frames)
+	{
+		if (a_frames <= 1) {
+			return 1;
+		}
+		if (a_state.tiered) {
+			return std::min(IconTier(a_state) + 1, a_frames);
+		}
+
+		const auto stage = std::min(a_state.stage, kStageCount - 1);
+		if (a_frames >= kStageCount) {
+			return stage + 1;
+		}
+		if (stage < kStagesOnFirstIconFrame) {
+			return 1;
+		}
+
+		const auto steps = kStageCount - kStagesOnFirstIconFrame;
+		const auto rank = stage - kStagesOnFirstIconFrame + 1;
+		return 1 + (rank * (a_frames - 1) + steps - 1) / steps;
+	}
+
 	ImU32 StageColor(const WidgetSettings& a_widget, const GaugeState& a_state)
 	{
 		const bool idle = a_state.timer && !a_state.active;

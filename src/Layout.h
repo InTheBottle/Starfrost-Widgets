@@ -15,6 +15,8 @@ namespace StarfrostWidgets::Layout
 	inline constexpr ImU32 kIdleColor = IM_COL32(146, 143, 136, 255);
 	inline constexpr float kIdleAlpha = 0.45f;
 
+	inline constexpr std::size_t kStagesOnFirstIconFrame = 2;
+
 	inline constexpr float kCaptionSize = 13.0f;
 	inline constexpr float kTimerDrop = 11.0f;
 	inline constexpr float kValueDrop = 8.0f;
@@ -28,6 +30,7 @@ namespace StarfrostWidgets::Layout
 		const GaugeState& a_state, bool a_survivalOn);
 
 	[[nodiscard]] std::size_t IconTier(const GaugeState& a_state);
+	[[nodiscard]] std::size_t IconFrame(const GaugeState& a_state, std::size_t a_frames);
 	[[nodiscard]] ImU32       StageColor(const WidgetSettings& a_widget, const GaugeState& a_state);
 	[[nodiscard]] float       StageAlpha(const Settings& a_settings, const GaugeState& a_state,
 			  float a_fade, double a_time);

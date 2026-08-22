@@ -169,7 +169,7 @@ namespace StarfrostWidgets::Skin
 			WidgetStyle style{ WidgetStyle::kRing };
 			std::size_t ringFrame{ SIZE_MAX };
 			std::size_t barFrame{ SIZE_MAX };
-			std::size_t tier{ SIZE_MAX };
+			std::size_t iconFrame{ SIZE_MAX };
 			ImU32       color{ 0 };
 			std::uint32_t attributes{ UINT32_MAX };
 			std::string caption{ "\x01" };
@@ -601,12 +601,11 @@ namespace StarfrostWidgets::Skin
 					}
 				}
 
-				// Only the injury icon carries tier frames; the rest hold a single one.
-				const auto tier = Layout::IconTier(a_state);
-				if (tier != a_last.tier) {
-					a_last.tier = tier;
+				const auto iconFrame = Layout::IconFrame(a_state, a_clips.iconFrames);
+				if (iconFrame != a_last.iconFrame) {
+					a_last.iconFrame = iconFrame;
 					if (a_clips.icon.IsDisplayObject()) {
-						GotoFrame(a_clips.icon, std::min(tier + 1, a_clips.iconFrames));
+						GotoFrame(a_clips.icon, iconFrame);
 					}
 				}
 			}
